@@ -1,0 +1,334 @@
+[
+  {
+    "id": "demo_entre",
+    "title": "Entre Mensagens",
+    "category": "Romance",
+    "authorId": "fan_demo",
+    "authorName": "Luna Stories",
+    "description": "Dois desconhecidos entram no mesmo grupo por engano. Uma conversa comum vira o começo de algo extraordinário.",
+    "coverAsset": "assets/covers/entre_mensagens.webp",
+    "coverUrl": "",
+    "contentRating": "12+",
+    "episodes": [
+      {
+        "title": "O grupo errado",
+        "lines": [
+          {
+            "id": "m1",
+            "speaker": "Lívia",
+            "text": "Gente... alguém sabe por que fui adicionada aqui? 😅"
+          },
+          {
+            "id": "m2",
+            "speaker": "Kael",
+            "text": "Eu ia perguntar exatamente a mesma coisa."
+          },
+          {
+            "id": "m3",
+            "speaker": "Lívia",
+            "text": "Talvez o universo esteja tentando nos dizer alguma coisa."
+          },
+          {
+            "id": "m4",
+            "speaker": "Kael",
+            "text": "Ou alguém errou dois números de telefone kkk"
+          },
+          {
+            "id": "m5",
+            "speaker": "Lívia",
+            "text": "Você sempre estraga o clima assim?"
+          },
+          {
+            "id": "m6",
+            "speaker": "Kael",
+            "text": "Só quando estou nervoso."
+          },
+          {
+            "id": "m7",
+            "speaker": "Lívia",
+            "text": "Nervoso? Por minha causa?",
+            "choiceId": "resposta1",
+            "options": [
+              "Talvez um pouquinho 😳",
+              "Imagina, nem te conheço!"
+            ]
+          },
+          {
+            "id": "m8",
+            "speaker": "Kael",
+            "text": "Pelo menos agora já temos uma história para contar."
+          },
+          {
+            "id": "m9",
+            "speaker": "Lívia",
+            "text": "Qual é o seu maior segredo?"
+          }
+        ]
+      },
+      {
+        "title": "Três pontos",
+        "lines": [
+          {
+            "id": "m1",
+            "speaker": "Kael",
+            "text": "Meu segredo é que eu volto a ler suas mensagens."
+          },
+          {
+            "id": "m2",
+            "speaker": "Lívia",
+            "text": "Todas?"
+          },
+          {
+            "id": "m3",
+            "speaker": "Kael",
+            "text": "Principalmente as que têm três pontinhos antes de chegar."
+          },
+          {
+            "id": "m4",
+            "speaker": "Lívia",
+            "text": "Você não faz ideia do sorriso que isso me deu."
+          },
+          {
+            "id": "m5",
+            "speaker": "Kael",
+            "text": "E você não faz ideia do meu."
+          },
+          {
+            "id": "m6",
+            "speaker": "Lívia",
+            "text": "A gente devia se encontrar algum dia..."
+          }
+        ]
+      },
+      {
+        "title": "Uma conversa de verdade",
+        "lines": [
+          {
+            "id": "m1",
+            "speaker": "Kael",
+            "text": "Estou na cafeteria da praça. Você viria?"
+          },
+          {
+            "id": "m2",
+            "speaker": "Lívia",
+            "text": "Acho que já estou na porta."
+          },
+          {
+            "id": "m3",
+            "speaker": "Kael",
+            "text": "É você com um livro roxo?"
+          },
+          {
+            "id": "m4",
+            "speaker": "Lívia",
+            "text": "Depende... você é o menino com o sorriso mais nervoso do lugar?"
+          },
+          {
+            "id": "m5",
+            "speaker": "Kael",
+            "text": "Culpado."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "demo_universos",
+    "title": "Universos Paralelos",
+    "category": "Fantasia",
+    "authorId": "fan_demo",
+    "authorName": "Nebula",
+    "description": "Uma mensagem de um número impossível conecta duas pessoas em universos diferentes.",
+    "coverAsset": "assets/covers/universos_paralelos.webp",
+    "coverUrl": "",
+    "contentRating": "Livre",
+    "episodes": [
+      {
+        "title": "Sinal impossível",
+        "lines": [
+          {
+            "id": "m1",
+            "speaker": "Noah",
+            "text": "Alô? Quem é você?"
+          },
+          {
+            "id": "m2",
+            "speaker": "Astra",
+            "text": "Eu deveria te perguntar isso. Como você encontrou meu sinal?"
+          },
+          {
+            "id": "m3",
+            "speaker": "Noah",
+            "text": "Esse número apareceu no meu sonho."
+          },
+          {
+            "id": "m4",
+            "speaker": "Astra",
+            "text": "No seu céu existem duas luas?"
+          },
+          {
+            "id": "m5",
+            "speaker": "Noah",
+            "text": "Não. Só uma."
+          },
+          {
+            "id": "m6",
+            "speaker": "Astra",
+            "text": "Então não estamos no mesmo mundo."
+          }
+        ]
+      },
+      {
+        "title": "A segunda lua",
+        "lines": [
+          {
+            "id": "m1",
+            "speaker": "Astra",
+            "text": "A segunda lua vai desaparecer em dez minutos."
+          },
+          {
+            "id": "m2",
+            "speaker": "Noah",
+            "text": "E o que acontece depois?"
+          },
+          {
+            "id": "m3",
+            "speaker": "Astra",
+            "text": "Nossa conversa acaba... a menos que você encontre uma porta."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "demo_meianoite",
+    "title": "Depois da Meia-Noite",
+    "category": "Mistério",
+    "authorId": "fan_demo",
+    "authorName": "Estrela Sombria",
+    "description": "Toda madrugada a mesma pessoa manda uma mensagem. O problema é que ela desapareceu há cinco anos.",
+    "coverAsset": "assets/covers/depois_da_meia_noite.webp",
+    "coverUrl": "",
+    "contentRating": "14+",
+    "episodes": [
+      {
+        "title": "00:01",
+        "lines": [
+          {
+            "id": "m1",
+            "speaker": "Desconhecido",
+            "text": "Você ainda mora naquela casa?"
+          },
+          {
+            "id": "m2",
+            "speaker": "Maya",
+            "text": "Quem está falando?"
+          },
+          {
+            "id": "m3",
+            "speaker": "Desconhecido",
+            "text": "Não acenda a luz do corredor."
+          },
+          {
+            "id": "m4",
+            "speaker": "Maya",
+            "text": "Como sabe que estou no corredor?"
+          },
+          {
+            "id": "m5",
+            "speaker": "Desconhecido",
+            "text": "Eu morei aí. Antes de morrer."
+          }
+        ]
+      },
+      {
+        "title": "O retrato",
+        "lines": [
+          {
+            "id": "m1",
+            "speaker": "Maya",
+            "text": "Achei uma foto antiga de você."
+          },
+          {
+            "id": "m2",
+            "speaker": "Desconhecido",
+            "text": "Olhe atrás da moldura."
+          },
+          {
+            "id": "m3",
+            "speaker": "Maya",
+            "text": "Tem um nome escrito aqui. É o meu."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "demo_cartas",
+    "title": "Cartas que Ficaram",
+    "category": "Drama",
+    "authorId": "fan_demo",
+    "authorName": "Sol de Papel",
+    "description": "Uma carta esquecida em um trem aproxima duas vidas que estavam prestes a seguir caminhos diferentes.",
+    "coverAsset": "assets/covers/cartas_que_ficaram.webp",
+    "coverUrl": "",
+    "contentRating": "Livre",
+    "episodes": [
+      {
+        "title": "Assento 14B",
+        "lines": [
+          {
+            "id": "m1",
+            "speaker": "Eva",
+            "text": "Acho que você deixou uma carta no trem."
+          },
+          {
+            "id": "m2",
+            "speaker": "Theo",
+            "text": "Não era para ninguém encontrar."
+          },
+          {
+            "id": "m3",
+            "speaker": "Eva",
+            "text": "Então por que escreveu na capa: para quem precisar?"
+          },
+          {
+            "id": "m4",
+            "speaker": "Theo",
+            "text": "Porque às vezes um estranho entende o que a gente não consegue dizer."
+          },
+          {
+            "id": "m5",
+            "speaker": "Eva",
+            "text": "Talvez eu tenha precisado dela hoje."
+          }
+        ]
+      },
+      {
+        "title": "Palavras guardadas",
+        "lines": [
+          {
+            "id": "m1",
+            "speaker": "Theo",
+            "text": "Você guardou a carta?"
+          },
+          {
+            "id": "m2",
+            "speaker": "Eva",
+            "text": "Guardei. E escrevi uma resposta."
+          },
+          {
+            "id": "m3",
+            "speaker": "Theo",
+            "text": "Posso ler?"
+          },
+          {
+            "id": "m4",
+            "speaker": "Eva",
+            "text": "Quando a gente se encontrar."
+          }
+        ]
+      }
+    ]
+  }
+]

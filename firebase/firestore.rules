@@ -1,0 +1,114 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function logged() { return request.auth != null; }
+    function owns(id) { return logged() && request.auth.uid == id; }
+    function isAuthor(storyId) {
+      return logged() &&
+        get(/databases/$(database)/documents/stories/$(storyId)).data.authorId == request.auth.uid;
+    }
+    function validStory() {
+      return request.resource.data.keys().hasOnly([
+        'title', 'description', 'category', 'authorId', 'authorName',
+        'coverAsset', 'coverUrl', 'contentRating', 'published',
+        'episodeCount', 'createdAt', 'updatedAt'
+      ])
+      && request.resource.data.title is string
+      && request.resource.data.title.size() >= 3
+      && request.resource.data.title.size() <= 70
+      && request.resource.data.description is string
+      && request.resource.data.description.size() >= 15
+      && request.resource.data.description.size() <= 800
+      && request.resource.data.authorId is string
+      && request.resource.data.authorName is string
+      && request.resource.data.category in ['Romance', 'Fantasia', 'Mistério', 'Drama', 'Terror', 'Comédia']
+      && request.resource.data.contentRating in ['Livre', '10+', '12+', '14+', '16+', '18+']
+      && request.resource.data.coverAsset is string
+      && request.resource.data.coverUrl is string
+      && request.resource.data.coverUrl.size() <= 2000
+      && request.resource.data.published is bool
+      && request.resource.data.episodeCount is int
+      && request.resource.data.episodeCount >= 0
+      && request.resource.data.episodeCount <= 50;
+    }
+
+    match /stories/{storyId} {
+      allow get, list: if resource.data.published == true
+        || (logged() && resource.data.authorId == request.auth.uid);
+      allow create: if logged() && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.published == false
+        && request.resource.data.episodeCount == 0
+        && validStory();
+      allow update: if logged() && resource.data.authorId == request.auth.uid
+        && request.resource.data.authorId == resource.data.authorId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.episodeCount >= resource.data.episodeCount
+        && validStory();
+      allow delete: if false;
+
+      match /episodes/{episodeId} {
+        allow get, list: if get(/databases/$(database)/documents/stories/$(storyId)).data.published == true
+          || isAuthor(storyId);
+        allow create: if isAuthor(storyId)
+          && request.resource.data.keys().hasOnly(['title', 'order', 'lines', 'createdAt'])
+          && request.resource.data.title is string
+          && request.resource.data.title.size() >= 3
+          && request.resource.data.title.size() <= 80
+          && request.resource.data.order is int
+          && request.resource.data.order >= 0 && request.resource.data.order < 50
+          && request.resource.data.lines is list
+          && request.resource.data.lines.size() >= 2
+          && request.resource.data.lines.size() <= 80;
+        allow update, delete: if false;
+      }
+    }
+
+    match /users/{userId} {
+      allow get: if owns(userId);
+      allow list: if false;
+      allow create: if owns(userId)
+        && request.resource.data.keys().hasOnly(['displayName', 'bio', 'createdAt'])
+        && request.resource.data.displayName is string
+        && request.resource.data.bio is string;
+      allow update: if owns(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'bio', 'createdAt'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 40
+        && request.resource.data.bio is string
+        && request.resource.data.bio.size() <= 160;
+      allow delete: if false;
+
+      match /library/{storyId} {
+        function validLibrary() {
+          return request.resource.data.keys().hasOnly(['saved', 'liked', 'episodeIndex', 'updatedAt'])
+            && request.resource.data.saved is bool
+            && request.resource.data.liked is bool
+            && request.resource.data.episodeIndex is int
+            && request.resource.data.episodeIndex >= 0
+            && request.resource.data.episodeIndex <= 50;
+        }
+        allow get, list: if owns(userId);
+        allow create, update: if owns(userId) && validLibrary();
+        allow delete: if owns(userId);
+      }
+      match /following/{authorId} {
+        allow get, list: if owns(userId);
+        allow create: if owns(userId)
+          && request.resource.data.keys().hasOnly(['createdAt']);
+        allow delete: if owns(userId);
+        allow update: if false;
+      }
+    }
+
+    match /reports/{reportId} {
+      allow create: if logged()
+        && request.resource.data.keys().hasOnly(['storyId', 'reporterId', 'reason', 'status', 'createdAt'])
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.storyId is string
+        && request.resource.data.reason in ['Conteúdo impróprio', 'Assédio ou discurso de ódio', 'Plágio', 'Outro motivo']
+        && request.resource.data.status == 'open';
+      // Read and moderation changes are restricted to trusted server tools/Admin SDK.
+      allow get, list, update, delete: if false;
+    }
+  }
+}
