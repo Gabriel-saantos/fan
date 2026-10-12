@@ -5,6 +5,7 @@ import '../../models/fan_models.dart';
 import '../widgets/fan_widgets.dart';
 import 'auth_page.dart';
 import 'reader_page.dart';
+import 'chapter_reader_page.dart';
 
 class DetailsPage extends StatefulWidget {
   const DetailsPage({super.key, required this.story});
@@ -90,6 +91,10 @@ class _DetailsPageState extends State<DetailsPage> {
             const SizedBox(height: 12), SizedBox(width: double.infinity, child: OutlinedButton.icon(
               onPressed: busy ? null : save, icon: Icon(state.saved ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded),
               label: Text(state.saved ? 'Salvo na biblioteca' : 'Salvar na biblioteca'))),
+            if (story.episodeCount > 0) TextButton.icon(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => ChapterReaderPage(story: story))),
+              icon: const Icon(Icons.article_outlined), label: const Text('Ler conversa em texto')),
           ]);
           return wide ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             artwork, const SizedBox(width: 40), Expanded(child: summary)])

@@ -224,9 +224,12 @@ class FanStore extends ChangeNotifier {
     }
     _notify();
   }
-  Future<void> updateLibrary(String storyId, {bool? saved, bool? liked, int? episodeIndex}) async {
+  Future<void> updateLibrary(String storyId, {bool? saved, bool? liked, int? episodeIndex, double? chapterProgress}) async {
     await _saveLibrary(storyId, libraryOf(storyId).copyWith(saved: saved, liked: liked,
-      started: episodeIndex != null ? true : null, episodeIndex: episodeIndex));
+      started: episodeIndex != null || chapterProgress != null ? true : null,
+      episodeIndex: chapterProgress == null ? episodeIndex : null,
+      chapterIndex: chapterProgress == null ? null : episodeIndex,
+      chapterProgress: chapterProgress?.clamp(0, 1).toDouble()));
   }
   Future<void> saveReading(String storyId, String episodeId, int visibleCount,
     Map<String, String> answers, {int? completedEpisodes, bool? completed}) async {
@@ -237,6 +240,19 @@ class FanStore extends ChangeNotifier {
       episodeIndex: completedEpisodes == null ? previousCount :
         (completedEpisodes > previousCount ? completedEpisodes : previousCount), completed: completed));
   }
+  Future<void> saveChapterReading(String storyId, {required int chapterIndex,
+    required double chapterProgress, int? completedEpisodes, bool completed = false}) async {
+    if (chapterIndex < 0 || chapterIndex >= 50 || !chapterProgress.isFinite) {
+      throw StateError('Posição do capítulo inválida.');
+    }
+    final old = libraryOf(storyId);
+    final previousCount = old.completed && !completed ? 0 : old.episodeIndex;
+    await _saveLibrary(storyId, old.copyWith(started: true, completed: completed,
+      chapterIndex: chapterIndex, chapterProgress: chapterProgress.clamp(0, 1).toDouble(),
+      episodeIndex: completedEpisodes == null ? previousCount :
+        (completedEpisodes > previousCount ? completedEpisodes : previousCount)));
+  }
+
   Future<void> toggleFollow(String authorId) async {
     _requireLogin(); if (authorId == uid) throw StateError('Você já é o autor desta história.');
     final followed = _following.contains(authorId);
@@ -257,6 +273,19 @@ class FanStore extends ChangeNotifier {
       .collection('episodes').orderBy('order').get();
     if (docs.docs.isEmpty && demoEpisodes.containsKey(storyId)) return List.of(demoEpisodes[storyId]!);
     return docs.docs.map((e) => FanEpisode.fromMap(e.id, e.data())).toList();
+  }
+
+  Future<List<FanChapter>> loadChapters(String storyId) async {
+    if (!firebaseEnabled || storyById(storyId)?.isDemo == true) {
+      return (await loadEpisodes(storyId)).map(FanChapter.fromEpisode).toList();
+    }
+    // Uses the existing episode collection, preserving IDs and ordering.
+    final docs = await FirebaseFirestore.instance.collection('stories').doc(storyId)
+      .collection('episodes').orderBy('order').get();
+    if (docs.docs.isEmpty && demoEpisodes.containsKey(storyId)) {
+      return demoEpisodes[storyId]!.map(FanChapter.fromEpisode).toList();
+    }
+    return docs.docs.map((d) => FanChapter.fromMap(d.id, d.data())).toList();
   }
 
   Future<String> uploadCover(Uint8List bytes) async {

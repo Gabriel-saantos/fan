@@ -71,31 +71,66 @@ class FanEpisode {
     'lines': lines.map((l) => l.toMap()).toList()};
 }
 
+/// Text chapter, or an explicitly labelled transcript of a chat episode.
+class FanChapter {
+  final String id, title;
+  final int order;
+  final List<String> paragraphs;
+  const FanChapter({required this.id, required this.title, required this.order,
+    required this.paragraphs});
+  factory FanChapter.fromMap(String id, Map<String, dynamic> json) {
+    final raw = json['paragraphs'];
+    if (raw is List || json['content'] is String) {
+      final text = raw is List ? raw.map((p) => '$p').toList()
+        : (json['content'] as String).split(RegExp(r'\n\s*\n'));
+      return FanChapter(id: id, title: '${json['title'] ?? 'Capítulo'}',
+        order: (json['order'] as num?)?.toInt() ?? 0,
+        paragraphs: text.map((p) => p.trim()).where((p) => p.isNotEmpty).toList());
+    }
+    return FanChapter.fromEpisode(FanEpisode.fromMap(id, json));
+  }
+  factory FanChapter.fromEpisode(FanEpisode episode) => FanChapter(
+    id: episode.id, title: episode.title, order: episode.order,
+    paragraphs: episode.lines.map((line) {
+      final text = line.speaker == 'Narrador' ? line.text : '${line.speaker}: ${line.text}';
+      return '${line.requires == null ? '' : '[Se a resposta for “${line.requires}”]\n'}$text'
+        '${line.options.isEmpty ? '' : '\nRespostas possíveis: ${line.options.join(' / ')}'}';
+    }).toList());
+  Map<String, dynamic> toMap() => {'title': title, 'order': order, 'paragraphs': paragraphs};
+}
+
 class LibraryState {
   final bool saved, liked, started, completed;
   /// Number of completed episodes. Kept compatible with the original schema.
   final int episodeIndex;
+  final int chapterIndex;
+  final double chapterProgress;
   final String currentEpisodeId;
   final int visibleCount;
   final Map<String, String> answers;
   const LibraryState({this.saved = false, this.liked = false, this.started = false,
     this.completed = false, this.episodeIndex = 0, this.currentEpisodeId = '',
+    this.chapterIndex = 0, this.chapterProgress = 0,
     this.visibleCount = 0, this.answers = const {}});
   LibraryState copyWith({bool? saved, bool? liked, bool? started, bool? completed,
-    int? episodeIndex, String? currentEpisodeId, int? visibleCount,
+    int? episodeIndex, int? chapterIndex, double? chapterProgress, String? currentEpisodeId, int? visibleCount,
     Map<String, String>? answers}) => LibraryState(saved: saved ?? this.saved,
     liked: liked ?? this.liked, started: started ?? this.started,
     completed: completed ?? this.completed, episodeIndex: episodeIndex ?? this.episodeIndex,
     currentEpisodeId: currentEpisodeId ?? this.currentEpisodeId,
+    chapterIndex: chapterIndex ?? this.chapterIndex, chapterProgress: chapterProgress ?? this.chapterProgress,
     visibleCount: visibleCount ?? this.visibleCount, answers: answers ?? this.answers);
   factory LibraryState.fromMap(Map<String, dynamic> json) => LibraryState(
     saved: json['saved'] == true, liked: json['liked'] == true,
     started: json['started'] == true || ((json['episodeIndex'] as num?) ?? 0) > 0,
     completed: json['completed'] == true, episodeIndex: (json['episodeIndex'] as num?)?.toInt() ?? 0,
     currentEpisodeId: '${json['currentEpisodeId'] ?? ''}',
+    chapterIndex: (json['chapterIndex'] as num?)?.toInt() ?? 0,
+    chapterProgress: ((json['chapterProgress'] as num?)?.toDouble() ?? 0).clamp(0, 1).toDouble(),
     visibleCount: (json['visibleCount'] as num?)?.toInt() ?? 0,
     answers: (json['answers'] as Map? ?? {}).map((k, v) => MapEntry('$k', '$v')));
   Map<String, dynamic> toMap() => {'saved': saved, 'liked': liked, 'started': started,
     'completed': completed, 'episodeIndex': episodeIndex,
+    'chapterIndex': chapterIndex, 'chapterProgress': chapterProgress,
     'currentEpisodeId': currentEpisodeId, 'visibleCount': visibleCount, 'answers': answers};
 }

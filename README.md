@@ -17,6 +17,8 @@ Sem configuração Firebase, o app utiliza um **perfil local sem e-mail nem senh
 
 Com Firebase configurado, o app utiliza Authentication, Firestore e Storage. A interface mostra erros de conexão e não apresenta denúncias locais como se tivessem sido enviadas à moderação. Adicionar episódios na nuvem utiliza uma transação para gravar o episódio e atualizar seu contador juntos.
 
+O botão **Ler conversa em texto** abre `ChapterReaderPage`. `FanChapter` aceita documentos com `paragraphs` ou `content` na coleção existente de episódios; para conversas, gera uma transcrição que mostra todas as mensagens, opções e condições explicitamente. Essa visualização não executa ramificações; use o leitor de conversa para escolher respostas. A posição de rolagem usa `chapterIndex`/`chapterProgress`, separados da contagem de episódios concluídos. Publique as regras Firestore atualizadas antes de sincronizar esses campos.
+
 As condições de mensagens usam o texto de uma resposta anterior (`requires`). Elas são ramificações simples dentro do episódio, não um editor de árvores de narrativa. Prefira textos de respostas distintos entre escolhas diferentes para evitar condições ambíguas.
 
 ## Executar
@@ -94,12 +96,13 @@ O deploy e a configuração de um projeto real não são executados automaticame
 
 ## Testes e validação
 
-A suíte contém 19 testes:
+A suíte contém 23 testes:
 
 - 3 de conteúdo e serialização, já existentes;
 - 5 do cursor de leitura: escolha final, ramificações, retomada e respostas antigas;
 - 7 de estado local: persistência, edição/publicação, saída, conclusão, validação, rascunhos e denúncias;
 - 4 de widgets: navegação em 390px/1440px, perfil local e prévia sem gravação na biblioteca.
+- 4 de capítulos: modelo de texto, transcrição de escolhas/condições, persistência da posição e avanço do leitor.
 
 ```sh
 flutter analyze
@@ -107,7 +110,7 @@ flutter test
 flutter build web --release --no-web-resources-cdn
 ```
 
-**Estado da validação nesta máquina:** a sintaxe dos arquivos Dart foi verificada com um parser; os ícones e APIs principais foram conferidos no código oficial do Flutter 3.35.7. Também foram verificados JSONs, sintaxe dos scripts e integridade do wrapper Gradle. A instalação do SDK Flutter permanece bloqueada por HTTP 403 em `storage.googleapis.com`, então a análise de tipos, os 19 testes, builds, execução visual e integração Firebase **ainda não foram executados**. Não considerar essa revisão uma compilação validada.
+**Estado da validação nesta máquina:** a sintaxe dos arquivos Dart foi verificada com um parser; os ícones e APIs principais foram conferidos no código oficial do Flutter 3.35.7. Também foram verificados JSONs, sintaxe dos scripts e integridade do wrapper Gradle. A instalação do SDK Flutter permanece bloqueada por HTTP 403 em `storage.googleapis.com`, então a análise de tipos, os 23 testes, builds, execução visual e integração Firebase **ainda não foram executados**. Não considerar essa revisão uma compilação validada.
 
 Para continuar no ambiente na nuvem, aplique a liberação de `storage.googleapis.com` nas configurações do ambiente, instale o SDK e execute os comandos acima. Dependências Dart usam `pub.dev` e `storage.googleapis.com`. O primeiro `flutter pub get` também gera `pubspec.lock`, que deve ser mantido no Git para builds reproduzíveis.
 

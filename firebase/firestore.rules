@@ -90,7 +90,7 @@ service cloud.firestore {
 
       match /library/{storyId} {
         function validLibrary() {
-          return request.resource.data.keys().hasOnly(['saved', 'liked', 'episodeIndex', 'updatedAt', 'started', 'completed', 'currentEpisodeId', 'visibleCount', 'answers'])
+          return request.resource.data.keys().hasOnly(['saved', 'liked', 'episodeIndex', 'updatedAt', 'started', 'completed', 'currentEpisodeId', 'visibleCount', 'answers', 'chapterIndex', 'chapterProgress'])
             && request.resource.data.saved is bool
             && request.resource.data.liked is bool
             && request.resource.data.episodeIndex is int
@@ -103,6 +103,12 @@ service cloud.firestore {
             && request.resource.data.get('visibleCount', 0) is int
             && request.resource.data.get('visibleCount', 0) >= 0
             && request.resource.data.get('visibleCount', 0) <= 80
+            && request.resource.data.get('chapterIndex', 0) is int
+            && request.resource.data.get('chapterIndex', 0) >= 0
+            && request.resource.data.get('chapterIndex', 0) < 50
+            && request.resource.data.get('chapterProgress', 0) is number
+            && request.resource.data.get('chapterProgress', 0) >= 0
+            && request.resource.data.get('chapterProgress', 0) <= 1
             && request.resource.data.get('answers', {}) is map
             && request.resource.data.get('answers', {}).size() <= 80;
         }
