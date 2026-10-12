@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
-printf '\nPreparando FAN para Android e Web...\n'
-flutter create --platforms=android,web --project-name fan --org com.tooapps .
+cd "$(dirname "$0")"
+command -v flutter >/dev/null || { echo 'Instale Flutter 3.35+ e adicione flutter/bin ao PATH.' >&2; exit 1; }
+flutter --version
 flutter pub get
-printf '\nPara conectar Firebase: flutterfire configure --platforms=android,web\n'
-printf 'Para testar: flutter run -d chrome\n'
+flutter analyze
+flutter test
+printf '\nWeb: flutter run -d chrome\nBuild Web: flutter build web --release --no-web-resources-cdn\n'

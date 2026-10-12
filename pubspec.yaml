@@ -4,7 +4,8 @@ description: FAN - histórias em formato de chat e universos criados pela comuni
 publish_to: none
 
 environment:
-  sdk: '>=3.5.0 <4.0.0'
+  sdk: '>=3.9.0 <4.0.0'
+  flutter: '>=3.35.0'
 
 dependencies:
   flutter:
@@ -14,7 +15,7 @@ dependencies:
   firebase_auth: ^6.4.0
   cloud_firestore: ^6.3.0
   firebase_storage: ^13.3.0
-  google_fonts: ^6.3.2
+  shared_preferences: ^2.5.3
   image_picker: ^1.2.2
 
 

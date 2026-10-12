@@ -2,194 +2,236 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/scope.dart';
 import '../../core/theme.dart';
+import '../../data/fan_store.dart';
 import '../../models/fan_models.dart';
+import '../../models/reader_session.dart';
 import '../widgets/fan_widgets.dart';
 
 class ReaderPage extends StatefulWidget {
-  const ReaderPage({super.key, required this.story, this.startIndex = 0});
+  const ReaderPage({super.key, required this.story, this.startIndex, this.previewEpisodes});
   final FanStory story;
-  final int startIndex;
+  final int? startIndex;
+  final List<FanEpisode>? previewEpisodes;
   @override
   State<ReaderPage> createState() => _ReaderPageState();
 }
-
 class _ReaderPageState extends State<ReaderPage> {
-  List<FanEpisode>? episodes;
-  String? failure;
-  late int index;
-  int visible = 1;
-  final Map<String, String> answers = {};
-  final ScrollController scroll = ScrollController();
-  bool _requested = false;
-
-  @override
-  void initState() { super.initState(); index = widget.startIndex; }
+  late FanStore store;
+  List<FanEpisode> episodes = [];
+  ReaderSession? session;
+  int index = 0;
+  bool requested = false, loading = true, auto = false, finishing = false;
+  String? error, saveError;
+  final scroll = ScrollController();
+  Timer? timer;
+  Future<void> writes = Future.value();
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_requested) { _requested = true; _load(); }
+    if (!requested) { requested = true; store = FanScope.of(context); load(); }
   }
-
-  Future<void> _load() async {
+  Future<void> load() async {
+    setState(() { loading = true; error = null; });
     try {
-      final result = await FanScope.of(context).loadEpisodes(widget.story.id);
-      if (mounted) setState(() { episodes = result; index = result.isEmpty ? 0 : index.clamp(0, result.length - 1).toInt(); });
-    } catch (e) { if (mounted) setState(() => failure = '$e'); }
+      final result = widget.previewEpisodes ?? await store.loadEpisodes(widget.story.id);
+      if (!mounted) return;
+      final progress = store.libraryOf(widget.story.id);
+      var target = widget.startIndex ?? 0;
+      if (widget.startIndex == null && !progress.completed) {
+        final savedIndex = result.indexWhere((e) => e.id == progress.currentEpisodeId);
+        target = savedIndex >= 0 ? savedIndex : progress.episodeIndex;
+      }
+      index = result.isEmpty ? 0 : target.clamp(0, result.length - 1).toInt();
+      episodes = result;
+      session = result.isEmpty ? null : ReaderSession(result[index],
+        visibleCount: widget.startIndex == null && !progress.completed && progress.currentEpisodeId == result[index].id
+          ? progress.visibleCount : 0,
+        answers: widget.startIndex == null && !progress.completed && progress.currentEpisodeId == result[index].id
+          ? progress.answers : const {});
+      setState(() => loading = false); queueSave(); bottom();
+    } catch (e) { if (mounted) setState(() { error = fanError(e); loading = false; }); }
   }
-
-  @override
-  void dispose() { scroll.dispose(); super.dispose(); }
-
-  FanEpisode? get current => episodes == null || episodes!.isEmpty ? null : episodes![index];
+  Future<void> queueSave() {
+    final s = session;
+    if (s == null || !store.signedIn || widget.previewEpisodes != null) return Future.value();
+    final episodeId = s.episode.id, visible = s.cursor;
+    final answers = Map<String, String>.of(s.answers);
+    final completedEpisodes = s.finished ? index + 1 : null;
+    final complete = s.finished && index == episodes.length - 1;
+    writes = writes.then((_) => store.saveReading(widget.story.id, episodeId, visible, answers,
+      completedEpisodes: completedEpisodes, completed: complete)).then((_) {
+        if (mounted && saveError != null) setState(() => saveError = null);
+      }).catchError((Object _) {
+        if (mounted) setState(() => saveError = 'Seu progresso ainda não foi salvo. Toque para tentar novamente.');
+      });
+    return writes;
+  }
   void bottom() => WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (scroll.hasClients) scroll.animateTo(scroll.position.maxScrollExtent,
-      duration: const Duration(milliseconds: 360), curve: Curves.easeOut);
+    if (!mounted || !scroll.hasClients) return;
+    if (store.reduceMotion || MediaQuery.disableAnimationsOf(context)) { scroll.jumpTo(scroll.position.maxScrollExtent); }
+    else { scroll.animateTo(scroll.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 240), curve: Curves.easeOut); }
   });
-
-  Future<void> advance() async {
-    final ep = current;
-    if (ep == null || visible >= ep.lines.length) return;
-    final last = ep.lines[visible - 1];
-    if (last.options.isNotEmpty && !answers.containsKey(last.choiceId ?? last.id)) {
-      fanMessage(context, 'Escolha uma resposta para continuar.'); return;
-    }
-    setState(() => visible += 1);
-    bottom();
-    if (visible >= ep.lines.length) await _recordProgress();
+  void advance() {
+    if (session?.advance() != true) return;
+    setState(() {}); queueSave(); bottom();
+    if (session!.finished) stopAuto();
   }
-
-  Future<void> _recordProgress() async {
-    final store = FanScope.of(context);
-    if (!store.signedIn) return;
-    try { await store.updateLibrary(widget.story.id, episodeIndex: index + 1); }
-    catch (_) { /* Keep reading even when offline. */ }
+  void choose(String value) {
+    session!.choose(value); setState(() {}); queueSave(); bottom();
   }
-
+  void stopAuto() { timer?.cancel(); if (mounted) setState(() => auto = false); }
+  void toggleAuto() {
+    if (auto) { stopAuto(); return; }
+    setState(() => auto = true);
+    timer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (session?.finished == true) { stopAuto(); }
+      else if (session?.pendingChoice == null) { advance(); }
+    });
+  }
   Future<void> next() async {
-    await _recordProgress();
+    if (finishing || session?.finished != true) return;
+    setState(() => finishing = true);
+    stopAuto(); await queueSave();
     if (!mounted) return;
-    if (index + 1 >= (episodes?.length ?? 0)) {
-      showDialog<void>(context: context, builder: (_) => AlertDialog(
-        title: const Text('Você chegou ao fim ✨'),
-        content: const Text('Mais uma história para guardar no coração. Explore outros universos!'),
-        actions: [TextButton(onPressed: () { Navigator.pop(context); Navigator.pop(context); },
-          child: const Text('Concluir'))],
-      ));
+    if (index + 1 == episodes.length) {
+      await showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.auto_awesome_rounded, color: FanColors.orchid, size: 36),
+        title: const Text('Um universo inteiro vivido.'),
+        content: Text('Você concluiu ${widget.story.title}. Que tal descobrir a próxima história?'),
+        actions: [FilledButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Voltar à história'))]));
+      if (mounted) Navigator.pop(context);
     } else {
-      setState(() { index++; visible = 1; answers.clear(); });
+      setState(() { index++; session = ReaderSession(episodes[index]); finishing = false; });
       if (scroll.hasClients) scroll.jumpTo(0);
+      queueSave();
     }
   }
-
+  Future<void> selectEpisode() async {
+    stopAuto();
+    final selected = await showModalBottomSheet<int>(context: context, isScrollControlled: true,
+      builder: (context) => SafeArea(child: SizedBox(height: MediaQuery.sizeOf(context).height * .65,
+        child: ListView(padding: const EdgeInsets.all(24), children: [
+          const Text('Episódios', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 16),
+          ...List.generate(episodes.length, (i) => ListTile(selected: i == index,
+            leading: Text('${i + 1}', style: const TextStyle(color: FanColors.orchid)),
+            title: Text(episodes[i].title), trailing: i == index ? const Icon(Icons.equalizer_rounded) : null,
+            onTap: () => Navigator.pop(context, i))),
+        ]))));
+    if (selected == null || !mounted) return;
+    await queueSave();
+    if (!mounted) return;
+    setState(() { index = selected; session = ReaderSession(episodes[index]); });
+    queueSave(); if (scroll.hasClients) scroll.jumpTo(0);
+  }
+  Future<void> restart() async {
+    final confirm = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Reiniciar episódio?'), content: const Text('As escolhas deste episódio serão reiniciadas.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Reiniciar'))]));
+    if (confirm != true || !mounted) return;
+    stopAuto(); setState(() => session = ReaderSession(episodes[index])); queueSave();
+    if (scroll.hasClients) scroll.jumpTo(0);
+  }
+  void settings() => showModalBottomSheet<void>(context: context, builder: (context) =>
+    StatefulBuilder(builder: (context, update) => SafeArea(child: Padding(padding: const EdgeInsets.all(24),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Uma leitura do seu jeito', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 24), Text('Tamanho do texto · ${store.readerFontSize.round()}'),
+        Slider(value: store.readerFontSize, min: 14, max: 22, divisions: 4,
+          onChanged: (v) { update(() => store.readerFontSize = v); setState(() {}); },
+          onChangeEnd: (v) => store.setReadingPreferences(fontSize: v)),
+        SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Reduzir animações'),
+          subtitle: const Text('Movimentos mais suaves durante a leitura.'), value: store.reduceMotion,
+          onChanged: (v) { store.setReadingPreferences(reducedMotion: v); update(() {}); }),
+      ])))));
+  @override
+  void dispose() { timer?.cancel(); scroll.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) {
-    final chapter = current;
-    final finished = chapter != null && visible >= chapter.lines.length;
-    return Scaffold(
-      appBar: AppBar(
-        titleSpacing: 0,
-        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(widget.story.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
-          Text(chapter == null ? 'Carregando...' : 'Episódio ${index + 1} de ${episodes!.length} · ${chapter.title}',
-            maxLines: 1, overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 9.5, color: FanColors.muted)),
-        ]),
-        actions: [
-          IconButton(tooltip: sound ? 'Desativar som' : 'Som indisponível nesta versão',
-            onPressed: () => fanMessage(context, 'Leitura silenciosa: áudio pode ser habilitado em uma atualização.'),
-            icon: const Icon(Icons.volume_off_outlined, color: FanColors.muted)),
-          PopupMenuButton<String>(onSelected: (v) {
-            if (v == 'restart') setState(() { visible = 1; answers.clear(); });
-          }, itemBuilder: (_) => const [PopupMenuItem(value: 'restart', child: Text('Reiniciar episódio'))]),
-        ],
-        bottom: PreferredSize(preferredSize: const Size.fromHeight(3), child: LinearProgressIndicator(
-          value: chapter == null || chapter.lines.isEmpty ? 0 : visible / chapter.lines.length,
-          minHeight: 3, backgroundColor: FanColors.surface2, color: FanColors.orchid)),
-      ),
-      body: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 730), child:
-        chapter == null
-          ? Center(child: failure == null ? const CircularProgressIndicator() : Text('Erro: $failure'))
-          : Column(children: [
-              Expanded(child: Container(
-                decoration: const BoxDecoration(image: DecorationImage(
-                  image: AssetImage('assets/backgrounds/stars.webp'), fit: BoxFit.cover, opacity: .20)),
-                child: ListView.builder(
-                  controller: scroll, padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
-                  itemCount: visible.clamp(0, chapter.lines.length),
-                  itemBuilder: (context, i) {
-                    final line = chapter.lines[i];
-                    if (line.requires != null && !answers.values.contains(line.requires)) {
-                      return const SizedBox.shrink();
-                    }
-                    final outgoing = line.speaker == 'Você';
-                    return Column(crossAxisAlignment: outgoing ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                      children: [
-                        Padding(padding: EdgeInsets.only(left: outgoing ? 55 : 0, right: outgoing ? 0 : 55),
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            if (!outgoing) CircleAvatar(radius: 12, backgroundColor: FanColors.surface2,
-                              child: Text(line.speaker.isEmpty ? '?' : line.speaker[0],
-                                style: const TextStyle(color: FanColors.orchid, fontSize: 10))),
-                            const SizedBox(width: 7),
-                            Text(line.speaker, style: const TextStyle(fontSize: 10.5,
-                              color: FanColors.muted, fontWeight: FontWeight.w700)),
-                          ])),
-                        const SizedBox(height: 6),
-                        Align(alignment: outgoing ? Alignment.centerRight : Alignment.centerLeft,
-                          child: Container(
-                            margin: EdgeInsets.only(bottom: 14, left: outgoing ? 48 : 8, right: outgoing ? 8 : 48),
-                            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
-                            decoration: BoxDecoration(
-                              color: outgoing ? FanColors.purple : FanColors.surface2,
-                              borderRadius: BorderRadius.only(
-                                topLeft: const Radius.circular(17), topRight: const Radius.circular(17),
-                                bottomLeft: Radius.circular(outgoing ? 17 : 5),
-                                bottomRight: Radius.circular(outgoing ? 5 : 17)),
-                              border: Border.all(color: outgoing ? FanColors.purple : FanColors.line)),
-                            child: Text(line.text, style: const TextStyle(fontSize: 12.5, height: 1.6)),
-                          )),
-                        if (line.options.isNotEmpty) ...[
-                          if (answers.containsKey(line.choiceId ?? line.id))
-                            Align(alignment: Alignment.centerRight, child: Padding(
-                              padding: const EdgeInsets.only(bottom: 14),
-                              child: FanTag('Você: ${answers[line.choiceId ?? line.id]!}', selected: true)))
-                          else if (i == visible - 1)
-                            ...line.options.map((choice) => Padding(
-                              padding: const EdgeInsets.only(bottom: 9, left: 38),
-                              child: SizedBox(width: double.infinity, child: OutlinedButton(
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: FanColors.pink, side: const BorderSide(color: FanColors.purple),
-                                  padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 15)),
-                                onPressed: () {
-                                  setState(() => answers[line.choiceId ?? line.id] = choice);
-                                  bottom();
-                                },
-                                child: Text(choice, style: const TextStyle(fontSize: 11)),
-                              )),
-                            )),
-                        ],
-                      ],
-                    );
-                  },
-                ),
-              )),
-              Container(padding: const EdgeInsets.fromLTRB(16, 11, 16, 15),
-                decoration: const BoxDecoration(color: FanColors.surface,
-                  border: Border(top: BorderSide(color: FanColors.line))),
-                child: SafeArea(top: false, child: Column(children: [
-                  if (!finished) ...[
-                    const Text('Toque para revelar a próxima mensagem',
-                      style: TextStyle(fontSize: 10, color: FanColors.muted)),
-                    const SizedBox(height: 9),
-                  ],
-                  FanButton(label: finished ? (index + 1 < episodes!.length
-                    ? 'Próximo episódio' : 'Concluir história') : 'Continuar conversa',
-                    icon: finished ? Icons.auto_awesome : Icons.keyboard_arrow_down_rounded,
-                    onPressed: finished ? next : advance),
-                ])),
-              ),
-            ]),
-      )),
+    final s = session;
+    final lines = s?.revealed ?? [];
+    return Scaffold(appBar: AppBar(titleSpacing: 0,
+      title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(widget.previewEpisodes != null ? 'Prévia · ${widget.story.title}' : widget.story.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          maxLines: 1, overflow: TextOverflow.ellipsis),
+        Text(s == null ? 'Seu próximo capítulo' : '${index + 1}/${episodes.length} · ${s.episode.title}',
+          style: const TextStyle(fontSize: 12, color: FanColors.muted), maxLines: 1, overflow: TextOverflow.ellipsis)]),
+      actions: [IconButton(tooltip: 'Ajustar leitura', onPressed: settings, icon: const Icon(Icons.text_fields_rounded)),
+        PopupMenuButton<String>(onSelected: (v) => v == 'episodes' ? selectEpisode() : restart(),
+          itemBuilder: (_) => const [PopupMenuItem(value: 'episodes', child: Text('Escolher episódio')),
+            PopupMenuItem(value: 'restart', child: Text('Reiniciar episódio'))])],
+      bottom: PreferredSize(preferredSize: const Size.fromHeight(3), child: LinearProgressIndicator(
+        value: s?.progress ?? 0, minHeight: 3, color: FanColors.purple, backgroundColor: FanColors.line))),
+      body: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 760), child:
+        loading ? const Center(child: CircularProgressIndicator())
+        : error != null ? Padding(padding: const EdgeInsets.all(24), child: FanEmptyState(
+          icon: Icons.wifi_off_rounded, title: 'A conversa não carregou.', message: error!,
+          actionLabel: 'Tentar novamente', onAction: load))
+        : s == null ? const Padding(padding: EdgeInsets.all(24), child: FanEmptyState(
+          icon: Icons.chat_bubble_outline_rounded, title: 'Esta conversa ainda está sendo escrita.',
+          message: 'Volte mais tarde para encontrar novos episódios.'))
+        : Column(children: [
+          Expanded(child: ListView(controller: scroll, padding: const EdgeInsets.fromLTRB(20, 24, 20, 30), children: [
+            Center(child: FanTag('Episódio ${index + 1} · ${s.episode.title}')),
+            const SizedBox(height: 28),
+            ...lines.map((line) => _ChatBubble(line: line, fontSize: store.readerFontSize,
+              answer: s.answers[line.answerKey])),
+            if (s.pendingChoice != null) ...[
+              const SizedBox(height: 12), const Text('Como você responde?', textAlign: TextAlign.center,
+                style: TextStyle(color: FanColors.orchid, fontSize: 13, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              ...s.pendingChoice!.options.map((value) => Padding(padding: const EdgeInsets.only(bottom: 10),
+                child: OutlinedButton(onPressed: () => choose(value),
+                  child: Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(value, textAlign: TextAlign.center))))),
+            ],
+            if (s.finished) const Padding(padding: EdgeInsets.symmetric(vertical: 24),
+              child: Text('Fim do episódio', textAlign: TextAlign.center, style: TextStyle(color: FanColors.muted))),
+          ])),
+          if (saveError != null) TextButton.icon(onPressed: queueSave,
+            icon: const Icon(Icons.sync_problem_rounded), label: Text(saveError!, textAlign: TextAlign.center)),
+          Container(padding: const EdgeInsets.all(18), decoration: const BoxDecoration(color: FanColors.surface,
+            border: Border(top: BorderSide(color: FanColors.line))), child: SafeArea(top: false,
+            child: Row(children: [
+              Expanded(child: FanButton(label: s.finished ? (index == episodes.length - 1 ? 'Concluir história' : 'Próximo episódio')
+                : s.pendingChoice != null ? 'Escolha uma resposta acima' : 'Próxima mensagem',
+                loading: finishing, icon: s.finished ? Icons.arrow_forward_rounded : Icons.keyboard_arrow_down_rounded,
+                onPressed: s.pendingChoice != null ? null : s.finished ? next : advance)),
+              if (!s.finished) ...[const SizedBox(width: 10), IconButton.filledTonal(
+                tooltip: auto ? 'Pausar leitura automática' : 'Leitura automática',
+                onPressed: toggleAuto, icon: Icon(auto ? Icons.pause_rounded : Icons.play_arrow_rounded))],
+            ]))),
+        ]))),
     );
+  }
+}
+class _ChatBubble extends StatelessWidget {
+  const _ChatBubble({required this.line, required this.fontSize, this.answer});
+  final ChatLine line;
+  final double fontSize;
+  final String? answer;
+  @override
+  Widget build(BuildContext context) {
+    final outgoing = line.speaker == 'Você', narrator = line.speaker == 'Narrador';
+    if (narrator) return Padding(padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
+      child: Text(line.text, textAlign: TextAlign.center,
+        style: TextStyle(fontSize: fontSize - 1, height: 1.8, fontStyle: FontStyle.italic, color: FanColors.muted)));
+    return Column(crossAxisAlignment: outgoing ? CrossAxisAlignment.end : CrossAxisAlignment.start, children: [
+      Padding(padding: const EdgeInsets.only(left: 4, bottom: 8), child: Text(line.speaker,
+        style: const TextStyle(fontSize: 12, color: FanColors.orchid, fontWeight: FontWeight.w600))),
+      Align(alignment: outgoing ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(constraints: const BoxConstraints(maxWidth: 540),
+          margin: EdgeInsets.only(bottom: 22, left: outgoing ? 36 : 0, right: outgoing ? 0 : 36),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+          decoration: BoxDecoration(color: outgoing ? const Color(0xFF493866) : FanColors.surface2,
+            borderRadius: BorderRadius.only(topLeft: const Radius.circular(18), topRight: const Radius.circular(18),
+              bottomLeft: Radius.circular(outgoing ? 18 : 4), bottomRight: Radius.circular(outgoing ? 4 : 18))),
+          child: SelectableText(line.text, style: TextStyle(fontSize: fontSize, height: 1.65)))),
+      if (answer != null) Align(alignment: Alignment.centerRight, child: Container(
+        margin: const EdgeInsets.only(bottom: 24), padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: FanColors.purple.withValues(alpha: .2), borderRadius: BorderRadius.circular(16)),
+        child: Text(answer!, style: TextStyle(fontSize: fontSize, color: FanColors.orchid)))),
+    ]);
   }
 }

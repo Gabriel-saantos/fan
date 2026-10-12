@@ -1,0 +1,26 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub/
+.pub-cache/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+# Local configuration and credentials
+android/local.properties
+android/.gradle/
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/key.properties
+*.jks
+*.keystore
+.env
+.env.*
+!*.example
+firebase-client.json
+firebase/seed/node_modules/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+coverage/

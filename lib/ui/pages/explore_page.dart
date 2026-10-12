@@ -1,57 +1,81 @@
 import 'package:flutter/material.dart';
 import '../../core/scope.dart';
 import '../../core/theme.dart';
+import '../../models/fan_models.dart';
 import '../widgets/fan_widgets.dart';
 import 'details_page.dart';
 
 class ExplorePage extends StatefulWidget {
-  const ExplorePage({super.key});
+  const ExplorePage({super.key, this.initialCategory = 'Todos', this.requestId = 0});
+  final String initialCategory;
+  final int requestId;
   @override
   State<ExplorePage> createState() => _ExplorePageState();
 }
-
 class _ExplorePageState extends State<ExplorePage> {
-  String term = '';
-  String category = 'Todos';
-  static const categories = ['Todos', 'Romance', 'Fantasia', 'Mistério', 'Drama', 'Terror', 'Comédia'];
-
+  final search = TextEditingController();
+  late String category;
+  String sort = 'Recomendadas';
+  String rating = 'Todas';
+  @override
+  void initState() { super.initState(); category = widget.initialCategory; }
+  @override
+  void didUpdateWidget(ExplorePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.requestId != widget.requestId) {
+      category = widget.initialCategory; search.clear(); rating = 'Todas';
+    }
+  }
+  @override
+  void dispose() { search.dispose(); super.dispose(); }
+  String normalize(String value) {
+    var text = value.toLowerCase().trim();
+    const accents = {'á':'a','à':'a','â':'a','ã':'a','é':'e','ê':'e','í':'i','ó':'o','ô':'o','õ':'o','ú':'u','ç':'c'};
+    accents.forEach((a, b) => text = text.replaceAll(a, b));
+    return text;
+  }
+  void reset() => setState(() { search.clear(); category = 'Todos'; rating = 'Todas'; sort = 'Recomendadas'; });
   @override
   Widget build(BuildContext context) {
-    final stories = FanScope.of(context).stories.where((s) {
-      return (category == 'Todos' || category == s.category) &&
-        ('${s.title} ${s.authorName} ${s.description}'.toLowerCase().contains(term.toLowerCase()));
-    }).toList();
-    return ListView(padding: const EdgeInsets.fromLTRB(20, 23, 20, 26), children: [
-      const Text('Explorar', style: TextStyle(fontSize: 27, fontWeight: FontWeight.w900, letterSpacing: -1)),
-      const SizedBox(height: 7),
-      const Text('Mundos incríveis esperam por você.', style: TextStyle(color: FanColors.muted, fontSize: 12)),
-      const SizedBox(height: 23),
-      TextField(onChanged: (text) => setState(() => term = text),
-        decoration: const InputDecoration(hintText: 'Buscar histórias, autores, universos...',
-          prefixIcon: Icon(Icons.search_rounded, color: FanColors.orchid))),
-      const SizedBox(height: 16),
-      SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children:
-        categories.map((c) => Padding(padding: const EdgeInsets.only(right: 7),
-          child: FanTag(c, selected: category == c, onTap: () => setState(() => category = c)))).toList(),
-      )),
-      const SizedBox(height: 20),
-      Text('${stories.length} histórias encontradas',
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11, color: FanColors.muted)),
-      const SizedBox(height: 12),
-      if (stories.isEmpty) const Padding(padding: EdgeInsets.symmetric(vertical: 40),
-        child: Center(child: Text('Nenhuma história com esses filtros.',
-          style: TextStyle(color: FanColors.muted))))
-      else LayoutBuilder(builder: (context, constraints) {
-        final cols = constraints.maxWidth > 700 ? 4 : (constraints.maxWidth > 440 ? 3 : 2);
-        return GridView.builder(
-          shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
-          itemCount: stories.length, gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: cols, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: .68),
-          itemBuilder: (context, i) => LayoutBuilder(builder: (context, box) => FanCover(
-            story: stories[i], width: box.maxWidth, height: box.maxHeight,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DetailsPage(story: stories[i]))),
-          )),
-        );
+    final list = FanScope.of(context).stories.where((s) =>
+      (category == 'Todos' || s.category == category) && (rating == 'Todas' || s.contentRating == rating) &&
+      normalize('${s.title} ${s.authorName} ${s.description} ${s.category}').contains(normalize(search.text))).toList();
+    if (sort == 'Título A–Z') list.sort((a, b) => normalize(a.title).compareTo(normalize(b.title)));
+    if (sort == 'Mais episódios') list.sort((a, b) => b.episodeCount.compareTo(a.episodeCount));
+    return ListView(padding: fanPagePadding(context), children: [
+      const FanPageHeader(eyebrow: 'Descobrir', title: 'Encontre seu próximo universo.',
+        subtitle: 'Do romance ao mistério, há uma conversa esperando por você.'),
+      TextField(controller: search, onChanged: (_) => setState(() {}), textInputAction: TextInputAction.search,
+        decoration: InputDecoration(hintText: 'Busque por título, autor ou assunto',
+          prefixIcon: const Icon(Icons.search_rounded),
+          suffixIcon: search.text.isEmpty ? null : IconButton(tooltip: 'Limpar busca',
+            onPressed: () => setState(search.clear), icon: const Icon(Icons.close_rounded)))),
+      const SizedBox(height: 18),
+      Wrap(spacing: 8, runSpacing: 8, children: ['Todos', ...storyCategories].map((c) =>
+        FanTag(c, selected: category == c, onTap: () => setState(() => category = c))).toList()),
+      const SizedBox(height: 22),
+      Wrap(spacing: 16, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
+        Text('${list.length} ${list.length == 1 ? 'história' : 'histórias'}', style: const TextStyle(color: FanColors.muted)),
+        SizedBox(width: 180, child: DropdownButtonFormField<String>(initialValue: sort,
+          decoration: const InputDecoration(labelText: 'Ordenar', contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+          items: ['Recomendadas', 'Título A–Z', 'Mais episódios'].map((s) => DropdownMenuItem(value: s,
+            child: Text(s, style: const TextStyle(fontSize: 12)))).toList(),
+          onChanged: (v) => setState(() => sort = v ?? sort))),
+        SizedBox(width: 160, child: DropdownButtonFormField<String>(initialValue: rating,
+          decoration: const InputDecoration(labelText: 'Classificação', contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+          items: ['Todas', ...contentRatings].map((s) => DropdownMenuItem(value: s,
+            child: Text(s, style: const TextStyle(fontSize: 12)))).toList(),
+          onChanged: (v) => setState(() => rating = v ?? rating))),
+      ]),
+      const SizedBox(height: 24),
+      if (list.isEmpty) FanEmptyState(icon: Icons.search_off_rounded, title: 'Ainda não encontramos essa história.',
+        message: 'Tente outro título, autor ou categoria.', actionLabel: 'Limpar filtros', onAction: reset)
+      else LayoutBuilder(builder: (context, box) {
+        final cols = box.maxWidth > 850 ? 4 : box.maxWidth > 540 ? 3 : 2;
+        final width = (box.maxWidth - (cols - 1) * 18) / cols;
+        return Wrap(spacing: 18, runSpacing: 28, children: list.map((s) => SizedBox(width: width,
+          child: FanStoryCard(story: s, onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => DetailsPage(story: s)))))).toList());
       }),
     ]);
   }

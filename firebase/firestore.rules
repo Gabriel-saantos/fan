@@ -43,6 +43,7 @@ service cloud.firestore {
         && request.resource.data.authorId == resource.data.authorId
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.episodeCount >= resource.data.episodeCount
+        && request.resource.data.episodeCount <= resource.data.episodeCount + 1
         && validStory();
       allow delete: if false;
 
@@ -59,7 +60,13 @@ service cloud.firestore {
           && request.resource.data.lines is list
           && request.resource.data.lines.size() >= 2
           && request.resource.data.lines.size() <= 80;
-        allow update, delete: if false;
+        allow update: if isAuthor(storyId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'lines'])
+          && request.resource.data.title is string
+          && request.resource.data.title.size() >= 3 && request.resource.data.title.size() <= 80
+          && request.resource.data.lines is list
+          && request.resource.data.lines.size() >= 2 && request.resource.data.lines.size() <= 80;
+        allow delete: if false;
       }
     }
 
@@ -69,7 +76,10 @@ service cloud.firestore {
       allow create: if owns(userId)
         && request.resource.data.keys().hasOnly(['displayName', 'bio', 'createdAt'])
         && request.resource.data.displayName is string
-        && request.resource.data.bio is string;
+        && request.resource.data.displayName.size() >= 2
+        && request.resource.data.displayName.size() <= 40
+        && request.resource.data.bio is string
+        && request.resource.data.bio.size() <= 160;
       allow update: if owns(userId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'bio', 'createdAt'])
         && request.resource.data.displayName is string
@@ -80,12 +90,27 @@ service cloud.firestore {
 
       match /library/{storyId} {
         function validLibrary() {
-          return request.resource.data.keys().hasOnly(['saved', 'liked', 'episodeIndex', 'updatedAt'])
+          return request.resource.data.keys().hasOnly(['saved', 'liked', 'episodeIndex', 'updatedAt', 'started', 'completed', 'currentEpisodeId', 'visibleCount', 'answers', 'chapterIndex', 'chapterProgress'])
             && request.resource.data.saved is bool
             && request.resource.data.liked is bool
             && request.resource.data.episodeIndex is int
             && request.resource.data.episodeIndex >= 0
-            && request.resource.data.episodeIndex <= 50;
+            && request.resource.data.episodeIndex <= 50
+            && request.resource.data.get('started', false) is bool
+            && request.resource.data.get('completed', false) is bool
+            && request.resource.data.get('currentEpisodeId', '') is string
+            && request.resource.data.get('currentEpisodeId', '').size() <= 128
+            && request.resource.data.get('visibleCount', 0) is int
+            && request.resource.data.get('visibleCount', 0) >= 0
+            && request.resource.data.get('visibleCount', 0) <= 80
+            && request.resource.data.get('chapterIndex', 0) is int
+            && request.resource.data.get('chapterIndex', 0) >= 0
+            && request.resource.data.get('chapterIndex', 0) < 50
+            && request.resource.data.get('chapterProgress', 0) is number
+            && request.resource.data.get('chapterProgress', 0) >= 0
+            && request.resource.data.get('chapterProgress', 0) <= 1
+            && request.resource.data.get('answers', {}) is map
+            && request.resource.data.get('answers', {}).size() <= 80;
         }
         allow get, list: if owns(userId);
         allow create, update: if owns(userId) && validLibrary();

@@ -3,10 +3,9 @@
 <head>
   <base href="$FLUTTER_BASE_HREF">
   <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=Edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="FAN: histórias em forma de chat, romance, fantasia e novas conexões.">
-  <meta name="theme-color" content="#0E0B18">
+  <meta name="description" content="FAN: descubra, leia e crie histórias interativas em formato de conversa.">
+  <meta name="theme-color" content="#101017">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="FAN">
@@ -14,8 +13,23 @@
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="manifest" href="manifest.json">
   <title>FAN · Histórias que conectam</title>
+  <style>
+    body { margin: 0; background: #101017; color: #f4f2fa; font-family: system-ui, sans-serif; }
+    #loading { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; gap: 16px; }
+    #loading strong { font-size: 48px; letter-spacing: -3px; color: #bba2ff; }
+    #loading p { margin: 0; color: #a9a6ba; font-size: 14px; }
+    .progress { width: 140px; height: 3px; background: #30303d; margin: 8px auto; border-radius: 8px; overflow: hidden; }
+    .progress::after { content: ''; display: block; width: 60%; height: 100%; background: #9b78ff; animation: loading 1.5s ease-in-out infinite alternate; }
+    @keyframes loading { to { transform: translateX(80%); } }
+    @media (prefers-reduced-motion: reduce) { .progress::after { animation: none; } }
+  </style>
 </head>
-<body style="background:#0E0B18;">
+<body>
+  <div id="loading" role="status" aria-live="polite"><strong>fan</strong><p>Seu próximo universo está chegando.</p><div class="progress"></div></div>
+  <noscript>Ative JavaScript para abrir o FAN.</noscript>
+  <script>
+    window.addEventListener('flutter-first-frame', () => document.getElementById('loading')?.remove());
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

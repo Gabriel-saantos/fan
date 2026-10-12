@@ -5,6 +5,7 @@ import '../../models/fan_models.dart';
 import '../widgets/fan_widgets.dart';
 import 'auth_page.dart';
 import 'reader_page.dart';
+import 'chapter_reader_page.dart';
 
 class DetailsPage extends StatefulWidget {
   const DetailsPage({super.key, required this.story});
@@ -12,158 +13,113 @@ class DetailsPage extends StatefulWidget {
   @override
   State<DetailsPage> createState() => _DetailsPageState();
 }
-
 class _DetailsPageState extends State<DetailsPage> {
-  late Future<List<FanEpisode>> episodeFuture;
-  @override
-  void initState() {
-    super.initState();
-    // Access scope after didChangeDependencies.
-  }
-  bool loaded = false;
+  Future<List<FanEpisode>>? future;
+  bool busy = false;
   @override
   void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!loaded) {
-      episodeFuture = FanScope.of(context).loadEpisodes(widget.story.id);
-      loaded = true;
-    }
+    super.didChangeDependencies(); future ??= FanScope.of(context).loadEpisodes(widget.story.id);
   }
-
-  Future<void> saveOrLike({bool isLike = false}) async {
-    if (!await requireFanLogin(context)) return;
-    if (!mounted) return;
-    final store = FanScope.of(context);
-    final state = store.libraryOf(widget.story.id);
+  Future<void> save({bool like = false}) async {
+    if (busy || !await requireFanLogin(context) || !mounted) return;
+    setState(() => busy = true);
+    final store = FanScope.of(context), state = FanScope.of(context).libraryOf(widget.story.id);
     try {
-      await store.updateLibrary(widget.story.id,
-        liked: isLike ? !state.liked : null,
-        saved: isLike ? null : !state.saved);
-    } catch (e) { if (mounted) fanMessage(context, '$e'); }
+      await store.updateLibrary(widget.story.id, saved: like ? null : !state.saved, liked: like ? !state.liked : null);
+    } catch (e) { if (mounted) fanMessage(context, fanError(e)); }
+    finally { if (mounted) setState(() => busy = false); }
   }
-
-  Future<void> followAuthor() async {
-    if (!await requireFanLogin(context)) return;
-    if (!mounted) return;
+  Future<void> follow() async {
+    if (busy || !await requireFanLogin(context) || !mounted) return;
+    setState(() => busy = true);
     try { await FanScope.of(context).toggleFollow(widget.story.authorId); }
-    catch (e) { if (mounted) fanMessage(context, '$e'); }
+    catch (e) { if (mounted) fanMessage(context, fanError(e)); }
+    finally { if (mounted) setState(() => busy = false); }
   }
-
-  Future<void> reportStory() async {
-    if (!await requireFanLogin(context)) return;
-    if (!mounted) return;
-    final reason = await showDialog<String>(context: context, builder: (context) => AlertDialog(
-      title: const Text('Denunciar história'),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
+  Future<void> report() async {
+    if (!await requireFanLogin(context) || !mounted) return;
+    final reason = await showDialog<String>(context: context, builder: (context) => SimpleDialog(
+      title: const Text('Denunciar história'), children: [
         for (final r in ['Conteúdo impróprio', 'Assédio ou discurso de ódio', 'Plágio', 'Outro motivo'])
-          ListTile(title: Text(r, style: const TextStyle(fontSize: 12)),
-            onTap: () => Navigator.pop(context, r)),
-      ]),
-    ));
+          SimpleDialogOption(onPressed: () => Navigator.pop(context, r), child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8), child: Text(r))),
+      ]));
     if (reason == null || !mounted) return;
     try {
       await FanScope.of(context).reportStory(widget.story.id, reason);
-      if (mounted) fanMessage(context, 'Denúncia registrada para revisão.');
-    } catch (e) { if (mounted) fanMessage(context, '$e'); }
+      if (mounted) fanMessage(context, 'Denúncia enviada para revisão.');
+    } catch (e) { if (mounted) fanMessage(context, fanError(e)); }
   }
-
+  void read({int? index}) => Navigator.push(context,
+    MaterialPageRoute(builder: (_) => ReaderPage(story: widget.story, startIndex: index)));
   @override
   Widget build(BuildContext context) {
     final store = FanScope.of(context);
-    final story = widget.story;
-    final lib = store.libraryOf(story.id);
-    return Scaffold(body: SafeArea(child: Center(child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 680),
-      child: ListView(children: [
-        Stack(children: [
-          SizedBox(height: 270, width: double.infinity, child:
-            story.coverUrl.isNotEmpty
-              ? Image.network(story.coverUrl, fit: BoxFit.cover,
-                  errorBuilder: (context, error, trace) => Image.asset(story.coverAsset, fit: BoxFit.cover))
-              : Image.asset(story.coverAsset, fit: BoxFit.cover)),
-          Positioned.fill(child: DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
-            begin: Alignment.topCenter, end: Alignment.bottomCenter,
-            colors: [FanColors.background.withOpacity(.12), FanColors.background],
-          )))),
-          Positioned(top: 14, left: 12, child: CircleAvatar(backgroundColor: FanColors.surface.withOpacity(.87),
-            child: IconButton(onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.arrow_back_rounded, color: FanColors.ink)))),
-          Positioned(top: 14, right: 12, child: Row(children: [
-            CircleAvatar(backgroundColor: FanColors.surface.withOpacity(.87),
-              child: IconButton(onPressed: () => saveOrLike(isLike: true),
-                icon: Icon(lib.liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                  color: FanColors.pink))),
-            const SizedBox(width: 7),
-            PopupMenuButton<String>(color: FanColors.surface2,
-              icon: const Icon(Icons.more_vert), onSelected: (v) {
-                if (v == 'report') reportStory();
-              }, itemBuilder: (_) => const [PopupMenuItem(value: 'report', child: Text('Denunciar história'))]),
-          ])),
-        ]),
-        Padding(padding: const EdgeInsets.fromLTRB(22, 4, 22, 25), child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start, children: [
-            FanTag(story.category, selected: true),
-            const SizedBox(height: 15),
-            Text(story.title, style: const TextStyle(fontSize: 29, fontWeight: FontWeight.w900, letterSpacing: -1)),
-            const SizedBox(height: 18),
-            Row(children: [
-              CircleAvatar(radius: 18, backgroundColor: FanColors.surface2,
+    final story = store.storyById(widget.story.id) ?? widget.story;
+    final state = store.libraryOf(story.id);
+    return Scaffold(appBar: AppBar(actions: [
+      IconButton(tooltip: state.liked ? 'Remover curtida' : 'Curtir história', onPressed: busy ? null : () => save(like: true),
+        icon: Icon(state.liked ? Icons.favorite_rounded : Icons.favorite_outline_rounded, color: FanColors.pink)),
+      if (store.hasCloud && !story.isDemo) PopupMenuButton<String>(onSelected: (_) => report(),
+        itemBuilder: (_) => const [PopupMenuItem(value: 'report', child: Text('Denunciar história'))]),
+    ]), body: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 1080),
+      child: ListView(padding: fanPagePadding(context), children: [
+        LayoutBuilder(builder: (context, box) {
+          final wide = box.maxWidth > 700;
+          final artwork = Center(child: FanCover(story: story, width: wide ? 280 : 210, height: wide ? 370 : 275));
+          final summary = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Wrap(spacing: 8, runSpacing: 8, children: [FanTag(story.category, selected: true),
+              FanTag(story.contentRating), if (story.isDemo) const FanTag('História de exemplo')]),
+            const SizedBox(height: 20), Text(story.title, style: Theme.of(context).textTheme.headlineLarge),
+            const SizedBox(height: 20), Row(children: [
+              CircleAvatar(backgroundColor: FanColors.surface2,
                 child: Text(story.authorName.isEmpty ? 'F' : story.authorName[0].toUpperCase(),
-                  style: const TextStyle(fontWeight: FontWeight.w900, color: FanColors.orchid))),
-              const SizedBox(width: 10),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(story.authorName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
-                const Text('Criador de universos', style: TextStyle(color: FanColors.muted, fontSize: 10)),
-              ])),
-              if (story.authorId != store.uid)
-                FanTag(store.follows(story.authorId) ? 'Seguindo ✓' : '+ Seguir', onTap: followAuthor),
+                  style: const TextStyle(color: FanColors.orchid))),
+              const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(story.authorName, style: const TextStyle(fontWeight: FontWeight.w700)),
+                const Text('Autor da história', style: TextStyle(color: FanColors.muted, fontSize: 12))])),
+              if (story.authorId != store.uid) TextButton(onPressed: busy ? null : follow,
+                child: Text(store.follows(story.authorId) ? 'Seguindo' : 'Seguir')),
             ]),
-            const SizedBox(height: 20),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              FanTag('${story.episodeCount} episódios', icon: Icons.chat_bubble_outline_rounded),
-              FanTag(story.contentRating, icon: Icons.shield_outlined),
-              if (story.isDemo) const FanTag('Amostra', icon: Icons.auto_awesome_rounded),
-            ]),
-            const SizedBox(height: 20),
-            Text(story.description, style: const TextStyle(color: FanColors.muted, height: 1.8, fontSize: 12)),
-            const SizedBox(height: 25),
-            FanButton(label: lib.episodeIndex > 0 ? 'Continuar leitura' : 'Iniciar leitura',
-              icon: Icons.play_arrow_rounded, onPressed: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => ReaderPage(story: story,
-                  startIndex: lib.episodeIndex >= story.episodeCount ? 0 : lib.episodeIndex)))),
-            const SizedBox(height: 12),
-            SizedBox(width: double.infinity, child: OutlinedButton.icon(
-              onPressed: saveOrLike, icon: Icon(lib.saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded),
-              label: Text(lib.saved ? 'Salvo na biblioteca' : 'Salvar na biblioteca'),
-              style: OutlinedButton.styleFrom(foregroundColor: FanColors.orchid,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                side: const BorderSide(color: FanColors.line)))),
+            const SizedBox(height: 22), Text(story.description,
+              style: const TextStyle(fontSize: 15, height: 1.8, color: FanColors.muted)),
+            const SizedBox(height: 18), Text('${story.episodeCount} episódios · Leitura interativa',
+              style: const TextStyle(color: FanColors.orchid, fontSize: 13)),
             const SizedBox(height: 24),
-            const FanSectionHeading(title: 'Episódios'),
-            FutureBuilder<List<FanEpisode>>(future: episodeFuture, builder: (context, snapshot) {
-              if (snapshot.connectionState != ConnectionState.done) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (snapshot.hasError) return Text('Falha ao carregar episódios: ${snapshot.error}',
-                style: const TextStyle(fontSize: 11, color: FanColors.pink));
-              final chapters = snapshot.data ?? [];
-              if (chapters.isEmpty) return const Text('Esta história ainda não tem episódios.',
-                style: TextStyle(color: FanColors.muted, fontSize: 12));
-              return Column(children: List.generate(chapters.length, (index) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(backgroundColor: FanColors.surface2,
-                  child: Text('${index + 1}', style: const TextStyle(color: FanColors.orchid, fontWeight: FontWeight.w900))),
-                title: Text(chapters[index].title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                subtitle: Text('${chapters[index].lines.length} mensagens',
-                  style: const TextStyle(color: FanColors.muted, fontSize: 10)),
-                trailing: const Icon(Icons.chevron_right_rounded, color: FanColors.orchid),
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReaderPage(
-                  story: story, startIndex: index))),
-              )));
-            }),
-          ],
-        )),
-      ]),
-    ))));
+            FanButton(label: state.completed ? 'Ler novamente' : state.started ? 'Continuar leitura' : 'Começar a ler',
+              icon: Icons.play_arrow_rounded, onPressed: story.episodeCount == 0 ? null : () => read()),
+            const SizedBox(height: 12), SizedBox(width: double.infinity, child: OutlinedButton.icon(
+              onPressed: busy ? null : save, icon: Icon(state.saved ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded),
+              label: Text(state.saved ? 'Salvo na biblioteca' : 'Salvar na biblioteca'))),
+            if (story.episodeCount > 0) TextButton.icon(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => ChapterReaderPage(story: story))),
+              icon: const Icon(Icons.article_outlined), label: const Text('Ler conversa em texto')),
+          ]);
+          return wide ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            artwork, const SizedBox(width: 40), Expanded(child: summary)])
+            : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [artwork, const SizedBox(height: 28), summary]);
+        }),
+        const SizedBox(height: 40), const FanSectionHeading(title: 'Cada conversa é um capítulo.'),
+        FutureBuilder<List<FanEpisode>>(future: future, builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) return const Padding(
+            padding: EdgeInsets.all(30), child: Center(child: CircularProgressIndicator()));
+          if (snapshot.hasError) return FanEmptyState(icon: Icons.wifi_off_rounded,
+            title: 'Não foi possível carregar os episódios.', message: 'Confira a conexão e tente novamente.',
+            actionLabel: 'Tentar novamente', onAction: () => setState(() => future = store.loadEpisodes(story.id)));
+          final episodes = snapshot.data ?? [];
+          if (episodes.isEmpty) return const FanEmptyState(icon: Icons.edit_note_rounded,
+            title: 'Novos capítulos estão a caminho.', message: 'Esta história ainda não tem episódios.');
+          return Column(children: List.generate(episodes.length, (i) => Padding(
+            padding: const EdgeInsets.only(bottom: 10), child: Card(child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              leading: CircleAvatar(backgroundColor: FanColors.surface2, child: i < state.episodeIndex
+                ? const Icon(Icons.check_rounded, color: FanColors.success)
+                : Text('${i + 1}', style: const TextStyle(color: FanColors.orchid))),
+              title: Text(episodes[i].title, style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: Text('${episodes[i].lines.length} mensagens', style: const TextStyle(color: FanColors.muted, fontSize: 12)),
+              trailing: const Icon(Icons.play_arrow_rounded, color: FanColors.orchid), onTap: () => read(index: i))))));
+        }),
+      ]))));
   }
 }
