@@ -1,72 +1,75 @@
-# FAN · Histórias que conectam
+# FAN 2.0 · Chat e capítulos
 
-Aplicativo Flutter de histórias interativas em formato de conversa, com interface escura, catálogo responsivo e estúdio de criação. O layout usa navegação inferior no celular e menu lateral em telas maiores.
+Nova base integrada a partir de **FAN_v2_chat_capitulos_flutter_firebase.zip**. O app mantém os dois formatos do ZIP — conversas interativas e livros com capítulos reais — e acrescenta interface responsiva, persistência local, edição, prévias e testes automatizados.
 
-## Fluxos implementados
+## O que está integrado
 
-- **Descobrir:** destaque editorial, categorias clicáveis, busca sem distinção de acentos, classificação indicativa e ordenação por título ou quantidade de episódios.
-- **Ler:** mensagens progressivas, escolhas obrigatórias, mensagens condicionais, seleção de episódios, prévia, leitura automática, reinício e ajuste do tamanho do texto.
-- **Continuar:** posição por mensagem e respostas são persistidas; leituras em andamento e concluídas aparecem separadamente na biblioteca.
-- **Biblioteca:** leituras, salvos, concluídos e curtidos.
-- **Estúdio:** criar e editar detalhes e capas, adicionar e editar episódios, reordenar mensagens, configurar escolhas, testar a prévia, publicar e retirar do catálogo. Rascunhos do editor são salvos automaticamente neste dispositivo.
-- **Perfil:** nome, biografia, preferências de leitura, saída e limpeza explícita dos dados locais.
+- **Início:** seções separadas para chats e livros, categorias clicáveis e retomada da leitura.
+- **Explorar:** busca por título/autor/assunto sem distinção de acentos, filtros por formato/categoria/classificação e ordenação.
+- **Chat:** reprodução automática, indicador animado de digitação, botão para revelar imediatamente, pausa, respostas obrigatórias e mensagens condicionais. Posição por mensagem e escolhas são persistidas.
+- **Livros:** capítulos nativos (`FanChapter`) com parágrafos, temas claro/escuro/sépia, fonte ajustável e posição de rolagem. Os capítulos usam a coleção `chapters`, não uma conversão de conversas em texto.
+- **Biblioteca:** lendo, salvos, concluídos e curtidos; cada formato abre seu leitor correto.
+- **Estúdio:** escolher formato, criar/editar detalhes e capas, criar/editar episódios ou capítulos, reordenar mensagens, configurar condições, visualizar a prévia, publicar e retirar do catálogo. Rascunhos de ambos os editores são salvos automaticamente.
+- **Perfil:** nome, biografia, preferências persistentes, apresentação inicial novamente, saída e limpeza confirmada dos dados locais.
+- **Primeira abertura:** apresentação em três etapas, adaptada também a telas pequenas e com opção de pular.
+- **Android/Web:** configuração de plataforma e wrapper Gradle verificado por checksum. Layout com menu lateral em telas maiores e navegação inferior no celular.
 
-### Local ou Firebase
+As fontes Sora, Roboto, símbolos e emojis estão incluídas localmente, com suas licenças. O Web não depende do download de fontes externas.
 
-Sem configuração Firebase, o app utiliza um **perfil local sem e-mail nem senha**. Perfil, histórias, episódios, biblioteca, escolhas e rascunhos são armazenados no dispositivo via `shared_preferences`. Sair do perfil preserva o trabalho; apagar dados requer confirmação. Não há sincronização entre dispositivos e limpar o armazenamento do navegador apaga esses dados. Capas enviadas no modo local têm limite de 512 KB; na nuvem, devem ter menos de 5 MB. As quatro histórias de exemplo e nove episódios já estão incluídos.
+A referência visual recebida está preservada em `design/mockup_referencia_do_usuario.png`.
 
-Com Firebase configurado, o app utiliza Authentication, Firestore e Storage. A interface mostra erros de conexão e não apresenta denúncias locais como se tivessem sido enviadas à moderação. Adicionar episódios na nuvem utiliza uma transação para gravar o episódio e atualizar seu contador juntos.
+## Abrir o projeto completo
 
-O botão **Ler conversa em texto** abre `ChapterReaderPage`. `FanChapter` aceita documentos com `paragraphs` ou `content` na coleção existente de episódios; para conversas, gera uma transcrição que mostra todas as mensagens, opções e condições explicitamente. Essa visualização não executa ramificações; use o leitor de conversa para escolher respostas. A posição de rolagem usa `chapterIndex`/`chapterProgress`, separados da contagem de episódios concluídos. Publique as regras Firestore atualizadas antes de sincronizar esses campos.
+Baixe a branch **`codex/fan-v2`** inteira e abra a pasta que contém `pubspec.yaml`. Evite misturar arquivos isolados da versão anterior: `StoryFormat`, `FanChapter`, os leitores e o estado foram integrados juntos.
 
-As condições de mensagens usam o texto de uma resposta anterior (`requires`). Elas são ramificações simples dentro do episódio, não um editor de árvores de narrativa. Prefira textos de respostas distintos entre escolhas diferentes para evitar condições ambíguas.
-
-## Executar
-
-Requisitos: Flutter **3.35+**, Dart **3.9+** e Chrome/Chromium para Web. Use a mesma versão do Flutter na equipe e na CI. O SDK não está incluído no repositório.
+Requisitos básicos: **Flutter 3.35.7**, Dart 3.9.2 (incluído nesse SDK) e Chrome/Chromium. O projeto aceita Flutter 3.35+, mas os testes e o lockfile desta entrega usam 3.35.7.
 
 ```sh
-flutter pub get
+flutter pub get --enforce-lockfile
 flutter analyze
-flutter test
+flutter test --concurrency=2
 flutter run -d chrome
 ```
 
-`./bootstrap.sh` ou `./bootstrap.ps1` executa instalação de pacotes, análise e testes. Esses scripts não usam `flutter create` sobre os fontes existentes.
+`./bootstrap.sh` e `./bootstrap.ps1` executam instalação, análise e testes. Não usam `flutter create` sobre os fontes existentes. O `pubspec.lock` está versionado para reproduzir as dependências validadas.
 
-Para um servidor de desenvolvimento sem interface gráfica:
-
-```sh
-flutter run -d web-server --web-hostname 0.0.0.0 --web-port 8080
-```
-
-Para gerar os arquivos Web incluindo o renderizador local:
+Build Web com renderizador incluído nos próprios arquivos:
 
 ```sh
 flutter build web --release --no-web-resources-cdn
 python3 -m http.server 8080 --directory build/web
 ```
 
-O modo local não solicita fontes externas: usa a fonte do sistema. Na nuvem, utilize o checkout já existente em `/workspace/fan`; cada tarefa já possui um ambiente isolado e não precisa de um worktree adicional.
-
-### Android
-
-Requer Java 17, Android SDK 36 e NDK 27.0.12077973. Gradle 8.14.3, AGP 8.10.1 e Kotlin 2.3.0 estão definidos nos arquivos Android. O wrapper Gradle está incluído; o JAR foi conferido com o SHA-256 oficial e a distribuição tem verificação de checksum configurada.
+Para desenvolvimento sem interface gráfica:
 
 ```sh
-flutter doctor
-flutter devices
-flutter run -d <id-do-dispositivo>
-flutter build apk --debug
+flutter run -d web-server --web-hostname 0.0.0.0 --web-port 8080
 ```
 
-Para uma versão de distribuição, forneça `android/key.properties`, ignorado pelo Git, com `storeFile`, `storePassword`, `keyAlias` e `keyPassword`. `storeFile` é relativo a `android/` ou absoluto. O build release usa essa chave quando configurada e não reutiliza a assinatura debug. Nunca versionar chaves e senhas.
+### Ambiente Codex na nuvem
 
-## Configurar Firebase
+Use o checkout existente `/workspace/fan`; cada tarefa já tem um ambiente isolado e não precisa de um worktree adicional.
 
-O modo local permite desenvolver sem conta Firebase. Para usar a nuvem, crie um projeto próprio, ative Email/Password em Authentication, Firestore e Storage, e cadastre o app Web/Android.
+```sh
+bash tooling/setup-cloud.sh
+source tooling/env.sh
+flutter analyze
+flutter test --concurrency=2
+```
 
-O arquivo `lib/firebase_options.dart` aceita a configuração pública do cliente por `--dart-define-from-file`. Crie um arquivo local `firebase-client.json` (ignorado pelo Git):
+O setup instala Flutter 3.35.7 do servidor oficial com verificação SHA-256, ativa caches graváveis dentro de `/workspace`, instala pacotes Dart com lockfile e instala as dependências dos testes Firebase via `npm ci`. O script foi executado nesta máquina. `tooling/env.sh` registra as variáveis necessárias para próximas sessões, sem alterar `HOME`.
+
+## Modo local
+
+Sem Firebase configurado, o app utiliza um **perfil local sem e-mail nem senha**. Perfil, favoritos, progresso, respostas, histórias, episódios, capítulos, capas e rascunhos são mantidos neste dispositivo via `shared_preferences`.
+
+Sair do perfil preserva o trabalho. A opção de apagar dados exige confirmação. Limpar o armazenamento do navegador remove esses dados; não existe sincronização entre dispositivos no modo local. Capas locais têm limite de 512 KB; na nuvem, devem ter menos de 5 MB. Há duas histórias de chat e dois livros de exemplo, com cinco episódios de chat e quatro capítulos de livro.
+
+## Conectar Firebase
+
+Crie um projeto próprio, registre os apps Web/Android e ative Authentication por Email/Password, Firestore e Storage. A conexão real não foi executada nesta entrega; a validação de permissões usa apenas um emulador local.
+
+O arquivo `lib/firebase_options.dart` aceita opções públicas por `--dart-define-from-file`. Crie um arquivo local `firebase-client.json`, ignorado pelo Git:
 
 ```json
 {
@@ -84,52 +87,73 @@ flutter run -d chrome --dart-define-from-file=firebase-client.json
 flutter build web --release --no-web-resources-cdn --dart-define-from-file=firebase-client.json
 ```
 
-Use o App ID correspondente à plataforma: o App ID Web não é o mesmo do Android. Esse arquivo contém configuração pública do SDK cliente; não coloque credenciais Admin, chave privada de conta de serviço ou tokens nele. Alternativamente, use `flutterfire configure --platforms=android,web` para gerar opções por plataforma.
+Use o App ID correspondente à plataforma. O App ID Web difere do Android. Esse arquivo contém configuração pública do SDK cliente, não credenciais Admin. Alternativamente, `flutterfire configure --platforms=android,web` gera opções por plataforma.
 
-As regras foram atualizadas para permitir posição por mensagem, escolhas e edição de episódios pelo autor. **O projeto Firebase precisa receber as regras atualizadas antes de usar esses novos campos.**
+**Publique as regras atualizadas antes de sincronizar os novos campos e editar conteúdo na nuvem.** Confirme seu projeto de destino:
 
 ```sh
 firebase deploy --project <seu-projeto> --only firestore:rules,firestore:indexes,storage
 ```
 
-O deploy e a configuração de um projeto real não são executados automaticamente. Para importar histórias iniciais, consulte `firebase/seed/seed.mjs`; ele exige uma conta de serviço externa ao repositório e escreve no projeto selecionado.
-
-## Testes e validação
-
-A suíte contém 23 testes:
-
-- 3 de conteúdo e serialização, já existentes;
-- 5 do cursor de leitura: escolha final, ramificações, retomada e respostas antigas;
-- 7 de estado local: persistência, edição/publicação, saída, conclusão, validação, rascunhos e denúncias;
-- 4 de widgets: navegação em 390px/1440px, perfil local e prévia sem gravação na biblioteca.
-- 4 de capítulos: modelo de texto, transcrição de escolhas/condições, persistência da posição e avanço do leitor.
-
-```sh
-flutter analyze
-flutter test
-flutter build web --release --no-web-resources-cdn
-```
-
-**Estado da validação nesta máquina:** a sintaxe dos arquivos Dart foi verificada com um parser; os ícones e APIs principais foram conferidos no código oficial do Flutter 3.35.7. Também foram verificados JSONs, sintaxe dos scripts e integridade do wrapper Gradle. A instalação do SDK Flutter permanece bloqueada por HTTP 403 em `storage.googleapis.com`, então a análise de tipos, os 23 testes, builds, execução visual e integração Firebase **ainda não foram executados**. Não considerar essa revisão uma compilação validada.
-
-Para continuar no ambiente na nuvem, aplique a liberação de `storage.googleapis.com` nas configurações do ambiente, instale o SDK e execute os comandos acima. Dependências Dart usam `pub.dev` e `storage.googleapis.com`. O primeiro `flutter pub get` também gera `pubspec.lock`, que deve ser mantido no Git para builds reproduzíveis.
-
-## Estrutura
+### Dados e compatibilidade
 
 ```text
-lib/
-  core/                 tema e acesso ao estado
-  data/                 catálogo de exemplo e estado/persistência
-  models/               entidades e cursor de leitura independente da UI
-  ui/pages/             catálogo, leitor, perfil, biblioteca e estúdio
-  ui/widgets/           componentes visuais e estados vazios
-  firebase_options.dart configuração pública por plataforma/build
-  main.dart             inicialização e ciclo de vida do estado
-assets/                 capas, identidade e fundo
-firebase/               regras, índices e importação opcional
-android/                plataforma e wrapper Gradle
-web/                    inicialização Web e manifesto
-test/                  modelos, leitura, estado e widgets
+stories/{storyId}
+  format: "chat" | "chapter"
+  title, description, category, authorId, authorName
+  coverAsset, coverUrl, contentRating, episodeCount, published
+
+stories/{storyId}/episodes/{episodeId}
+  title, order, lines[{id, speaker, text, choiceId?, options?, requires?}]
+
+stories/{storyId}/chapters/{chapterId}
+  title, order, paragraphs[]
+
+users/{uid}/library/{storyId}
+  saved, liked, started, completed, episodeIndex
+  currentEpisodeId, visibleCount, answers
+  chapterIndex, chapterProgress, updatedAt
 ```
 
-Antes de distribuir com conteúdo público, ainda são necessários moderação administrativa, fluxo de exclusão de conta/dados na nuvem, políticas de privacidade e validação das regras com emuladores/projeto de teste. As regras limitam autoria, campos e tamanho das listas, mas não fazem validação profunda de cada mensagem nem moderação automática.
+Histórias antigas sem `format` continuam como chat. O formato fica fixo após criar a história. `episodeCount` conta episódios ou capítulos, de acordo com o formato. Adições na nuvem usam transações para gravar a seção e seu contador juntos. A posição atual do capítulo fica separada da contagem de partes concluídas. O progresso antigo com `chapterProgress` e `episodeIndex` é interpretado pelo novo modelo.
+
+Condições de mensagens usam o texto de uma resposta anterior (`requires`). São ramificações simples dentro do episódio; prefira opções distintas entre perguntas diferentes para evitar condições ambíguas.
+
+O importador opcional `firebase/seed/seed.mjs` inclui os dois formatos. Ele faz upsert e não remove conteúdo antigo. Exige credenciais Admin fora do repositório ou um emulador e não é executado automaticamente.
+
+## Validação
+
+- **33 testes Flutter:** modelos, formatos, cursor de chat, escolhas, persistência, edição/publicação, capítulos nativos, apresentação inicial, layouts de 390px/1440px, pausa/digitação e editor.
+- **8 testes Firestore:** leitura pública/privada, autoria, transação de capítulo, separação dos formatos, edição, retirada de publicação, privacidade/progresso e histórias legadas.
+- `flutter analyze`: sem problemas.
+- `flutter build web --release --no-web-resources-cdn`: compilação concluída.
+- Chromium: apresentação, início, filtro de livros e abertura de capítulos verificados em 1440px e 390px, sem erros de console. Capturas reais em `design/screenshots/`.
+
+Para repetir os testes de regras, use Node.js 22+ e Java 21+:
+
+```sh
+npm ci --prefix firebase/tests --include=dev
+cd firebase/tests
+npm test
+```
+
+Esses testes usam o projeto fictício `demo-fan` e o emulador Firestore na porta 8085; não acessam banco de produção. Mensagens de `PERMISSION_DENIED` aparecem nos casos que verificam rejeições esperadas.
+
+## Android
+
+Requer Java 17+, Android SDK 36 e NDK 27.0.12077973. Gradle 8.14.3, AGP 8.10.1 e Kotlin 2.3.0 estão definidos na plataforma.
+
+```sh
+flutter doctor
+flutter devices
+flutter run -d <id-do-dispositivo>
+flutter build apk --debug
+```
+
+O wrapper Gradle está incluído, com JAR verificado e checksum da distribuição configurado. Para distribuição, forneça `android/key.properties` com `storeFile`, `storePassword`, `keyAlias` e `keyPassword`. Esse arquivo e as chaves são ignorados pelo Git. A configuração release não reutiliza a assinatura debug.
+
+**Build Android e integração com Firebase real ainda não foram executados.** Esta entrega contém código-fonte; não um APK validado.
+
+## Antes de distribuir conteúdo público
+
+Ainda são necessários moderação administrativa, fluxo de exclusão de conta/dados na nuvem e documentos de privacidade. As regras controlam autoria, formatos, campos e limites das listas, mas não substituem moderação nem validação profunda de cada mensagem/parágrafo no servidor.

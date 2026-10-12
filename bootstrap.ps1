@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 flutter --version
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-flutter pub get
+flutter pub get --enforce-lockfile
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 flutter analyze
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

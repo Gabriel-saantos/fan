@@ -3,15 +3,25 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function logged() { return request.auth != null; }
     function owns(id) { return logged() && request.auth.uid == id; }
+    function story(storyId) {
+      return get(/databases/$(database)/documents/stories/$(storyId));
+    }
     function isAuthor(storyId) {
-      return logged() &&
-        get(/databases/$(database)/documents/stories/$(storyId)).data.authorId == request.auth.uid;
+      return logged() && story(storyId).data.authorId == request.auth.uid;
+    }
+    function mayReadStory(storyId) {
+      return story(storyId).data.published == true || isAuthor(storyId);
     }
     function validStory() {
       return request.resource.data.keys().hasOnly([
         'title', 'description', 'category', 'authorId', 'authorName',
-        'coverAsset', 'coverUrl', 'contentRating', 'published',
+        'coverAsset', 'coverUrl', 'contentRating', 'published', 'format',
         'episodeCount', 'createdAt', 'updatedAt'
+      ])
+      && request.resource.data.keys().hasAll([
+        'title', 'description', 'category', 'authorId', 'authorName',
+        'coverAsset', 'coverUrl', 'contentRating', 'published',
+        'episodeCount'
       ])
       && request.resource.data.title is string
       && request.resource.data.title.size() >= 3
@@ -21,8 +31,10 @@ service cloud.firestore {
       && request.resource.data.description.size() <= 800
       && request.resource.data.authorId is string
       && request.resource.data.authorName is string
+      && request.resource.data.authorName.size() <= 80
       && request.resource.data.category in ['Romance', 'Fantasia', 'Mistério', 'Drama', 'Terror', 'Comédia']
       && request.resource.data.contentRating in ['Livre', '10+', '12+', '14+', '16+', '18+']
+      && request.resource.data.get('format', 'chat') in ['chat', 'chapter']
       && request.resource.data.coverAsset is string
       && request.resource.data.coverUrl is string
       && request.resource.data.coverUrl.size() <= 2000
@@ -38,19 +50,21 @@ service cloud.firestore {
       allow create: if logged() && request.resource.data.authorId == request.auth.uid
         && request.resource.data.published == false
         && request.resource.data.episodeCount == 0
-        && validStory();
-      allow update: if logged() && resource.data.authorId == request.auth.uid
+        && validStory()
+        && request.resource.data.keys().hasAll(['format']);
+      allow update: if isAuthor(storyId)
+        && validStory()
         && request.resource.data.authorId == resource.data.authorId
+        && request.resource.data.get('format', 'chat') == resource.data.get('format', 'chat')
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.episodeCount >= resource.data.episodeCount
-        && request.resource.data.episodeCount <= resource.data.episodeCount + 1
-        && validStory();
+        && request.resource.data.episodeCount <= resource.data.episodeCount + 1;
       allow delete: if false;
 
       match /episodes/{episodeId} {
-        allow get, list: if get(/databases/$(database)/documents/stories/$(storyId)).data.published == true
-          || isAuthor(storyId);
+        allow get, list: if mayReadStory(storyId);
         allow create: if isAuthor(storyId)
+          && story(storyId).data.get('format', 'chat') == 'chat'
           && request.resource.data.keys().hasOnly(['title', 'order', 'lines', 'createdAt'])
           && request.resource.data.title is string
           && request.resource.data.title.size() >= 3
@@ -68,6 +82,28 @@ service cloud.firestore {
           && request.resource.data.lines.size() >= 2 && request.resource.data.lines.size() <= 80;
         allow delete: if false;
       }
+
+      match /chapters/{chapterId} {
+        allow get, list: if mayReadStory(storyId);
+        allow create: if isAuthor(storyId)
+          && story(storyId).data.format == 'chapter'
+          && request.resource.data.keys().hasOnly(['title', 'order', 'paragraphs', 'createdAt'])
+          && request.resource.data.title is string
+          && request.resource.data.title.size() >= 3
+          && request.resource.data.title.size() <= 80
+          && request.resource.data.order is int
+          && request.resource.data.order >= 0 && request.resource.data.order < 50
+          && request.resource.data.paragraphs is list
+          && request.resource.data.paragraphs.size() >= 1
+          && request.resource.data.paragraphs.size() <= 300;
+        allow update: if isAuthor(storyId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'paragraphs'])
+          && request.resource.data.title is string
+          && request.resource.data.title.size() >= 3 && request.resource.data.title.size() <= 80
+          && request.resource.data.paragraphs is list
+          && request.resource.data.paragraphs.size() >= 1 && request.resource.data.paragraphs.size() <= 300;
+        allow delete: if false;
+      }
     }
 
     match /users/{userId} {
@@ -76,7 +112,6 @@ service cloud.firestore {
       allow create: if owns(userId)
         && request.resource.data.keys().hasOnly(['displayName', 'bio', 'createdAt'])
         && request.resource.data.displayName is string
-        && request.resource.data.displayName.size() >= 2
         && request.resource.data.displayName.size() <= 40
         && request.resource.data.bio is string
         && request.resource.data.bio.size() <= 160;
@@ -130,9 +165,10 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['storyId', 'reporterId', 'reason', 'status', 'createdAt'])
         && request.resource.data.reporterId == request.auth.uid
         && request.resource.data.storyId is string
-        && request.resource.data.reason in ['Conteúdo impróprio', 'Assédio ou discurso de ódio', 'Plágio', 'Outro motivo']
+        && request.resource.data.reason in [
+          'Conteúdo impróprio', 'Assédio ou discurso de ódio', 'Plágio', 'Outro motivo']
         && request.resource.data.status == 'open';
-      // Read and moderation changes are restricted to trusted server tools/Admin SDK.
+      // Admin SDK/backend only. Do not grant client read access to reports.
       allow get, list, update, delete: if false;
     }
   }

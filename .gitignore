@@ -24,3 +24,10 @@ firebase-debug.log
 firestore-debug.log
 ui-debug.log
 coverage/
+
+# Integration test dependencies and emulator caches
+**/node_modules/
+.firebase/
+
+# Generated platform registration
+**/GeneratedPluginRegistrant.java

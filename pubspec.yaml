@@ -1,6 +1,6 @@
 name: fan
-version: 1.0.0+1
-description: FAN - histórias em formato de chat e universos criados pela comunidade.
+version: 2.0.0+2
+description: FAN - histórias interativas em chat e livros em capítulos.
 publish_to: none
 
 environment:
@@ -26,7 +26,24 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  fonts:
+    - family: Sora
+      fonts:
+        - asset: assets/fonts/Sora.ttf
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto.ttf
+    - family: NotoSymbols
+      fonts:
+        - asset: assets/fonts/NotoSymbols.ttf
+    - family: NotoEmoji
+      fonts:
+        - asset: assets/fonts/NotoEmoji.ttf
   assets:
     - assets/covers/
     - assets/branding/
     - assets/backgrounds/
+    - assets/fonts/OFL-Sora.txt
+    - assets/fonts/OFL-Roboto.txt
+    - assets/fonts/OFL-NotoSymbols.txt
+    - assets/fonts/OFL-NotoEmoji.txt
