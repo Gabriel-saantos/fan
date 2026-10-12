@@ -1,7 +1,14 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+val signingFile = rootProject.file("key.properties")
+val signingProperties = Properties().apply {
+    if (signingFile.exists()) signingFile.inputStream().use { load(it) }
 }
 
 android {
@@ -25,10 +32,21 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (signingFile.exists()) {
+            create("release") {
+                keyAlias = signingProperties.getProperty("keyAlias")
+                keyPassword = signingProperties.getProperty("keyPassword")
+                storePassword = signingProperties.getProperty("storePassword")
+                storeFile = rootProject.file(signingProperties.getProperty("storeFile"))
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // LOCAL TEST ONLY. Add your own upload keystore before Play Store distribution.
-            signingConfig = signingConfigs.getByName("debug")
+            // Production builds use an explicit upload key; never the debug certificate.
+            if (signingFile.exists()) signingConfig = signingConfigs.getByName("release")
         }
     }
 }

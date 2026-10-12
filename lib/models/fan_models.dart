@@ -1,111 +1,101 @@
-class FanStory {
-  final String id;
-  final String title;
-  final String description;
-  final String category;
-  final String authorId;
-  final String authorName;
-  final String coverAsset;
-  final String coverUrl;
-  final String contentRating;
-  final int episodeCount;
-  final bool published;
-  final bool isDemo;
+const storyCategories = ['Romance', 'Fantasia', 'Mistério', 'Drama', 'Terror', 'Comédia'];
+const contentRatings = ['Livre', '10+', '12+', '14+', '16+', '18+'];
+const coverAssets = [
+  'assets/covers/entre_mensagens.webp',
+  'assets/covers/universos_paralelos.webp',
+  'assets/covers/depois_da_meia_noite.webp',
+  'assets/covers/cartas_que_ficaram.webp',
+];
 
-  const FanStory({
-    required this.id, required this.title, required this.description,
+class FanStory {
+  final String id, title, description, category, authorId, authorName;
+  final String coverAsset, coverUrl, contentRating;
+  final int episodeCount;
+  final bool published, isDemo;
+  const FanStory({required this.id, required this.title, required this.description,
     required this.category, required this.authorId, required this.authorName,
     required this.coverAsset, this.coverUrl = '', this.contentRating = 'Livre',
-    this.episodeCount = 0, this.published = true, this.isDemo = false,
-  });
+    this.episodeCount = 0, this.published = true, this.isDemo = false});
 
   factory FanStory.fromMap(String id, Map<String, dynamic> json) => FanStory(
-    id: id,
-    title: (json['title'] ?? '').toString(),
-    description: (json['description'] ?? '').toString(),
-    category: (json['category'] ?? 'Drama').toString(),
-    authorId: (json['authorId'] ?? '').toString(),
-    authorName: (json['authorName'] ?? 'Autor FAN').toString(),
-    coverAsset: (json['coverAsset'] ?? 'assets/covers/entre_mensagens.webp').toString(),
-    coverUrl: (json['coverUrl'] ?? '').toString(),
-    contentRating: (json['contentRating'] ?? 'Livre').toString(),
-    episodeCount: (json['episodeCount'] is num) ? (json['episodeCount'] as num).toInt() : 0,
-    published: json['published'] == true,
-    isDemo: false,
-  );
+    id: id, title: '${json['title'] ?? ''}', description: '${json['description'] ?? ''}',
+    category: '${json['category'] ?? 'Drama'}', authorId: '${json['authorId'] ?? ''}',
+    authorName: '${json['authorName'] ?? 'Autor FAN'}',
+    coverAsset: '${json['coverAsset'] ?? coverAssets.first}', coverUrl: '${json['coverUrl'] ?? ''}',
+    contentRating: '${json['contentRating'] ?? 'Livre'}',
+    episodeCount: (json['episodeCount'] as num?)?.toInt() ?? 0,
+    published: json['published'] == true, isDemo: json['isDemo'] == true);
 
-  FanStory copyWith({int? episodeCount, bool? published, String? coverUrl}) => FanStory(
-    id: id, title: title, description: description, category: category,
-    authorId: authorId, authorName: authorName, coverAsset: coverAsset,
-    coverUrl: coverUrl ?? this.coverUrl, contentRating: contentRating,
-    episodeCount: episodeCount ?? this.episodeCount,
-    published: published ?? this.published, isDemo: isDemo,
-  );
+  Map<String, dynamic> toMap() => {'title': title, 'description': description,
+    'category': category, 'authorId': authorId, 'authorName': authorName,
+    'coverAsset': coverAsset, 'coverUrl': coverUrl, 'contentRating': contentRating,
+    'episodeCount': episodeCount, 'published': published};
+
+  FanStory copyWith({String? title, String? description, String? category,
+    String? contentRating, String? coverAsset, String? coverUrl,
+    int? episodeCount, bool? published}) => FanStory(id: id,
+    title: title ?? this.title, description: description ?? this.description,
+    category: category ?? this.category, contentRating: contentRating ?? this.contentRating,
+    coverAsset: coverAsset ?? this.coverAsset, coverUrl: coverUrl ?? this.coverUrl,
+    episodeCount: episodeCount ?? this.episodeCount, published: published ?? this.published,
+    authorId: authorId, authorName: authorName, isDemo: isDemo);
 }
 
 class ChatLine {
-  final String id;
-  final String speaker;
-  final String text;
-  final String? choiceId;
+  final String id, speaker, text;
+  final String? choiceId, requires;
   final List<String> options;
-  final String? requires;
-
-  const ChatLine({
-    required this.id, required this.speaker, required this.text,
-    this.choiceId, this.options = const [], this.requires,
-  });
-
+  const ChatLine({required this.id, required this.speaker, required this.text,
+    this.choiceId, this.options = const [], this.requires});
+  String get answerKey => choiceId ?? id;
   factory ChatLine.fromMap(Map<String, dynamic> json) => ChatLine(
-    id: (json['id'] ?? '').toString(),
-    speaker: (json['speaker'] ?? 'Narrador').toString(),
-    text: (json['text'] ?? '').toString(),
-    choiceId: json['choiceId']?.toString(),
-    options: (json['options'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
-    requires: json['requires']?.toString(),
-  );
-
-  Map<String, dynamic> toMap() => {
-    'id': id, 'speaker': speaker, 'text': text,
+    id: '${json['id'] ?? ''}', speaker: '${json['speaker'] ?? 'Narrador'}',
+    text: '${json['text'] ?? ''}', choiceId: json['choiceId']?.toString(),
+    options: (json['options'] as List? ?? []).map((e) => '$e').toList(),
+    requires: json['requires']?.toString());
+  Map<String, dynamic> toMap() => {'id': id, 'speaker': speaker, 'text': text,
     if (choiceId != null) 'choiceId': choiceId,
-    if (options.isNotEmpty) 'options': options,
-    if (requires != null) 'requires': requires,
-  };
+    if (options.isNotEmpty) 'options': options, if (requires != null) 'requires': requires};
 }
 
 class FanEpisode {
-  final String id;
-  final String title;
+  final String id, title;
   final int order;
   final List<ChatLine> lines;
-
   const FanEpisode({required this.id, required this.title, required this.order, required this.lines});
-
   factory FanEpisode.fromMap(String id, Map<String, dynamic> json) => FanEpisode(
-    id: id, title: (json['title'] ?? 'Episódio').toString(),
-    order: (json['order'] is num) ? (json['order'] as num).toInt() : 0,
-    lines: (json['lines'] as List<dynamic>? ?? [])
-        .whereType<Map>()
-        .map((e) => ChatLine.fromMap(Map<String, dynamic>.from(e))).toList(),
-  );
-
-  Map<String, dynamic> toMap() => {
-    'title': title, 'order': order,
-    'lines': lines.map((l) => l.toMap()).toList(),
-  };
+    id: id, title: '${json['title'] ?? 'Episódio'}', order: (json['order'] as num?)?.toInt() ?? 0,
+    lines: (json['lines'] as List? ?? []).whereType<Map>()
+      .map((e) => ChatLine.fromMap(Map<String, dynamic>.from(e))).toList());
+  Map<String, dynamic> toMap() => {'title': title, 'order': order,
+    'lines': lines.map((l) => l.toMap()).toList()};
 }
 
 class LibraryState {
-  final bool saved;
-  final bool liked;
+  final bool saved, liked, started, completed;
+  /// Number of completed episodes. Kept compatible with the original schema.
   final int episodeIndex;
-  const LibraryState({this.saved = false, this.liked = false, this.episodeIndex = 0});
-  LibraryState copyWith({bool? saved, bool? liked, int? episodeIndex}) => LibraryState(
-    saved: saved ?? this.saved, liked: liked ?? this.liked,
-    episodeIndex: episodeIndex ?? this.episodeIndex,
-  );
+  final String currentEpisodeId;
+  final int visibleCount;
+  final Map<String, String> answers;
+  const LibraryState({this.saved = false, this.liked = false, this.started = false,
+    this.completed = false, this.episodeIndex = 0, this.currentEpisodeId = '',
+    this.visibleCount = 0, this.answers = const {}});
+  LibraryState copyWith({bool? saved, bool? liked, bool? started, bool? completed,
+    int? episodeIndex, String? currentEpisodeId, int? visibleCount,
+    Map<String, String>? answers}) => LibraryState(saved: saved ?? this.saved,
+    liked: liked ?? this.liked, started: started ?? this.started,
+    completed: completed ?? this.completed, episodeIndex: episodeIndex ?? this.episodeIndex,
+    currentEpisodeId: currentEpisodeId ?? this.currentEpisodeId,
+    visibleCount: visibleCount ?? this.visibleCount, answers: answers ?? this.answers);
   factory LibraryState.fromMap(Map<String, dynamic> json) => LibraryState(
     saved: json['saved'] == true, liked: json['liked'] == true,
-    episodeIndex: (json['episodeIndex'] is num) ? (json['episodeIndex'] as num).toInt() : 0,
-  );
+    started: json['started'] == true || ((json['episodeIndex'] as num?) ?? 0) > 0,
+    completed: json['completed'] == true, episodeIndex: (json['episodeIndex'] as num?)?.toInt() ?? 0,
+    currentEpisodeId: '${json['currentEpisodeId'] ?? ''}',
+    visibleCount: (json['visibleCount'] as num?)?.toInt() ?? 0,
+    answers: (json['answers'] as Map? ?? {}).map((k, v) => MapEntry('$k', '$v')));
+  Map<String, dynamic> toMap() => {'saved': saved, 'liked': liked, 'started': started,
+    'completed': completed, 'episodeIndex': episodeIndex,
+    'currentEpisodeId': currentEpisodeId, 'visibleCount': visibleCount, 'answers': answers};
 }
